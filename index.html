@@ -2,44 +2,154 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <title>Proyectos Miti-Miti (v2)</title>
+  <title>Proyectos Miti-Miti (v3)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
   <style>
-    html, body { height: 100%; margin: 0; }
-    #map { width: 100%; height: 100%; }
+    html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; }
 
-    /* Popup liviano y legible */
+    /* Layout: panel + mapa */
+    .app {
+      height: 100%;
+      display: grid;
+      grid-template-columns: 320px 1fr;
+    }
+
+    .panel {
+      padding: 14px 14px 10px 14px;
+      border-right: 1px solid #ddd;
+      background: #fff;
+      overflow: auto;
+    }
+
+    .panel h1 {
+      font-size: 16px;
+      margin: 0 0 10px 0;
+      font-weight: 700;
+    }
+
+    .panel .muted {
+      color: #666;
+      font-size: 12px;
+      margin-bottom: 12px;
+      line-height: 1.3;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      margin: 10px 0 6px 0;
+      font-weight: 700;
+    }
+
+    select, input {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 13px;
+      outline: none;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .btn {
+      margin-top: 10px;
+      width: 100%;
+      padding: 9px 10px;
+      border: 1px solid #222;
+      background: #222;
+      color: white;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .btn.secondary {
+      background: #fff;
+      color: #222;
+    }
+
+    .stats {
+      margin-top: 10px;
+      font-size: 12px;
+      color: #333;
+      padding: 10px;
+      border-radius: 10px;
+      background: #f6f6f6;
+      line-height: 1.4;
+    }
+
+    #map { height: 100%; }
+
+    /* Popup */
     .popup-wrap { max-height: 260px; overflow: auto; }
     .popup-title { font-weight: 700; margin: 0 0 6px 0; }
     table.popup-table { width: 100%; border-collapse: collapse; font-size: 12px; }
     table.popup-table th { text-align: left; vertical-align: top; padding: 3px 6px 3px 0; white-space: nowrap; }
     table.popup-table td { padding: 3px 0; word-break: break-word; }
+
+    /* Mobile */
+    @media (max-width: 820px) {
+      .app { grid-template-columns: 1fr; grid-template-rows: 260px 1fr; }
+      .panel { border-right: none; border-bottom: 1px solid #ddd; }
+    }
   </style>
 </head>
 <body>
 
-<div id="map"></div>
+<div class="app">
+  <div class="panel">
+    <h1>Proyectos Miti-Miti</h1>
+    <div class="muted">
+      Filtra por provincia y cantón. Haz clic en un punto para ver los atributos.
+    </div>
+
+    <label for="provinciaSelect">Provincia</label>
+    <select id="provinciaSelect">
+      <option value="">(Todas)</option>
+    </select>
+
+    <label for="cantonSelect">Cantón</label>
+    <select id="cantonSelect" disabled>
+      <option value="">(Todos)</option>
+    </select>
+
+    <label for="buscarInput">Buscar (proyecto / promotor / registro)</label>
+    <input id="buscarInput" type="text" placeholder="Ej: Galilea, MIDUVI..., Los Prados..." />
+
+    <button class="btn" id="aplicarBtn">Aplicar filtros</button>
+    <button class="btn secondary" id="limpiarBtn">Limpiar</button>
+
+    <div class="stats" id="statsBox">
+      Cargando datos…
+    </div>
+  </div>
+
+  <div id="map"></div>
+</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-  // Mapa base
+  // ====== Mapa ======
   var map = L.map('map', { preferCanvas: true }).setView([-1.5, -78.5], 6);
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap'
   }).addTo(map);
 
-  // Orden de campos (exactamente como tus propiedades)
+  // Orden de campos (tus propiedades)
   var FIELD_ORDER = [
-    "NRO_REGIS", "PROVINCIA", "CANTÓN", "PARROQUIA", "SECTOR",
-    "PROYECTO", "VIVIENDAS", "TIPO_VIVIE", "PROMOTOR", "CONTACTO", "MAIL", "WEB"
+    "NRO_REGIS","PROVINCIA","CANTÓN","PARROQUIA","SECTOR",
+    "PROYECTO","VIVIENDAS","TIPO_VIVIE","PROMOTOR","CONTACTO","MAIL","WEB"
   ];
 
   function escapeHtml(s) {
@@ -52,7 +162,6 @@
     if (val === null || val === undefined || val === "") return "";
     if (key === "WEB") {
       var u = String(val).trim();
-      // si no tiene http(s), le anteponemos https://
       if (u && !/^https?:\/\//i.test(u)) u = "https://" + u;
       return `<a href="${escapeHtml(u)}" target="_blank" rel="noopener">${escapeHtml(u)}</a>`;
     }
@@ -61,20 +170,10 @@
 
   function buildPopupHTML(props) {
     props = props || {};
-
-    // título del popup (liviano)
     var title = props.PROYECTO ? escapeHtml(props.PROYECTO) : "Detalle";
 
-    // tabla con TODOS los atributos (solo los que existan)
-    var rows = FIELD_ORDER.map(function (k) {
+    var rows = FIELD_ORDER.map(function(k){
       if (!(k in props)) return "";
-      var v = props[k];
-      if (v === null || v === undefined || v === "") return "";
-      return `<tr><th>${escapeHtml(k)}:</th><td>${formatValue(k, v)}</td></tr>`;
-    }).join("");
-
-    // Por si hubiera campos adicionales no listados (no debería, pero por seguridad)
-    var extras = Object.keys(props).filter(k => !FIELD_ORDER.includes(k)).map(function(k){
       var v = props[k];
       if (v === null || v === undefined || v === "") return "";
       return `<tr><th>${escapeHtml(k)}:</th><td>${formatValue(k, v)}</td></tr>`;
@@ -83,40 +182,162 @@
     return `
       <div class="popup-wrap">
         <div class="popup-title">${title}</div>
-        <table class="popup-table">
-          ${rows}${extras}
-        </table>
+        <table class="popup-table">${rows}</table>
       </div>
     `;
   }
 
+  // ====== UI ======
+  var provinciaSelect = document.getElementById('provinciaSelect');
+  var cantonSelect = document.getElementById('cantonSelect');
+  var buscarInput = document.getElementById('buscarInput');
+  var aplicarBtn = document.getElementById('aplicarBtn');
+  var limpiarBtn = document.getElementById('limpiarBtn');
+  var statsBox = document.getElementById('statsBox');
+
+  // ====== Datos y capas ======
+  var allFeatures = [];      // features originales
+  var geoLayer = null;       // capa en el mapa (solo lo filtrado)
+
+  function normalizeStr(s) {
+    return String(s ?? "").toUpperCase().trim();
+  }
+
+  function setStats(total, shown, prov, canton, q) {
+    statsBox.innerHTML = `
+      <strong>Total:</strong> ${total.toLocaleString()}<br>
+      <strong>Mostrando:</strong> ${shown.toLocaleString()}<br>
+      <strong>Provincia:</strong> ${prov || "(Todas)"}<br>
+      <strong>Cantón:</strong> ${canton || "(Todos)"}<br>
+      <strong>Búsqueda:</strong> ${q ? escapeHtml(q) : "(Ninguna)"}
+    `;
+  }
+
+  function getUniqueSorted(arr) {
+    return Array.from(new Set(arr)).filter(Boolean).sort((a,b) => a.localeCompare(b));
+  }
+
+  function populateProvincias() {
+    var provs = getUniqueSorted(allFeatures.map(f => normalizeStr(f.properties?.PROVINCIA)));
+    // reset
+    provinciaSelect.innerHTML = `<option value="">(Todas)</option>` +
+      provs.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join("");
+  }
+
+  function populateCantones(prov) {
+    var cantones = allFeatures
+      .filter(f => normalizeStr(f.properties?.PROVINCIA) === prov)
+      .map(f => normalizeStr(f.properties?.["CANTÓN"]));
+
+    cantones = getUniqueSorted(cantones);
+
+    cantonSelect.innerHTML = `<option value="">(Todos)</option>` +
+      cantones.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
+
+    cantonSelect.disabled = false;
+  }
+
+  function clearCantones() {
+    cantonSelect.innerHTML = `<option value="">(Todos)</option>`;
+    cantonSelect.disabled = true;
+  }
+
+  function renderFeatures(features) {
+    // borra capa anterior
+    if (geoLayer) {
+      map.removeLayer(geoLayer);
+      geoLayer = null;
+    }
+
+    geoLayer = L.geoJSON(features, {
+      pointToLayer: function (feature, latlng) {
+        return L.circleMarker(latlng, {
+          radius: 5,
+          weight: 1,
+          fillOpacity: 0.85
+        });
+      },
+      onEachFeature: function (feature, layer) {
+        layer.on('click', function () {
+          layer.bindPopup(buildPopupHTML(feature.properties || {}), { maxWidth: 420 }).openPopup();
+        });
+      }
+    }).addTo(map);
+
+    if (features.length) {
+      map.fitBounds(geoLayer.getBounds(), { padding: [20, 20] });
+    }
+  }
+
+  function applyFilters() {
+    var prov = provinciaSelect.value ? normalizeStr(provinciaSelect.value) : "";
+    var canton = cantonSelect.value ? normalizeStr(cantonSelect.value) : "";
+    var q = buscarInput.value ? buscarInput.value.trim() : "";
+
+    var qn = normalizeStr(q);
+
+    var filtered = allFeatures.filter(function(f){
+      var p = f.properties || {};
+      var fp = normalizeStr(p.PROVINCIA);
+      var fc = normalizeStr(p["CANTÓN"]);
+
+      if (prov && fp !== prov) return false;
+      if (canton && fc !== canton) return false;
+
+      if (qn) {
+        var haystack = [
+          p.PROYECTO, p.PROMOTOR, p.NRO_REGIS
+        ].map(x => normalizeStr(x)).join(" | ");
+        if (!haystack.includes(qn)) return false;
+      }
+      return true;
+    });
+
+    renderFeatures(filtered);
+    setStats(allFeatures.length, filtered.length, prov, canton, q);
+  }
+
+  function clearFilters() {
+    provinciaSelect.value = "";
+    buscarInput.value = "";
+    clearCantones();
+    renderFeatures(allFeatures);
+    setStats(allFeatures.length, allFeatures.length, "", "", "");
+  }
+
+  // Eventos UI
+  provinciaSelect.addEventListener('change', function() {
+    var prov = provinciaSelect.value ? normalizeStr(provinciaSelect.value) : "";
+    if (!prov) {
+      clearCantones();
+      return;
+    }
+    populateCantones(prov);
+    cantonSelect.value = ""; // resetea canton
+  });
+
+  aplicarBtn.addEventListener('click', applyFilters);
+  limpiarBtn.addEventListener('click', clearFilters);
+
+  // Enter en búsqueda
+  buscarInput.addEventListener('keydown', function(e){
+    if (e.key === "Enter") applyFilters();
+  });
+
+  // ====== Cargar GeoJSON ======
   fetch('miti_miti_proyectos.geojson')
     .then(r => r.json())
     .then(data => {
-
-      var capa = L.geoJSON(data, {
-        // Marcador liviano (mejor rendimiento que pins)
-        pointToLayer: function (feature, latlng) {
-          return L.circleMarker(latlng, {
-            radius: 5,
-            weight: 1,
-            fillOpacity: 0.85
-          });
-        },
-        // Popup bajo demanda (solo al click)
-        onEachFeature: function (feature, layer) {
-          layer.on('click', function () {
-            var html = buildPopupHTML(feature.properties || {});
-            layer.bindPopup(html, { maxWidth: 420 }).openPopup();
-          });
-        }
-      }).addTo(map);
-
-      map.fitBounds(capa.getBounds(), { padding: [20, 20] });
+      // Guardamos features
+      allFeatures = data.features || [];
+      populateProvincias();
+      renderFeatures(allFeatures);
+      setStats(allFeatures.length, allFeatures.length, "", "", "");
     })
     .catch(err => {
-      console.error("Error cargando el GeoJSON:", err);
-      alert("No se pudo cargar el GeoJSON. Revisa que el archivo exista en el repo y que el nombre coincida.");
+      console.error(err);
+      statsBox.textContent = "Error cargando el GeoJSON. Verifica que el archivo exista y el nombre coincida.";
+      alert("No se pudo cargar el GeoJSON. Revisa el nombre del archivo en el repo.");
     });
 </script>
 
