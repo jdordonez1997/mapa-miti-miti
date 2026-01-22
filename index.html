@@ -364,20 +364,17 @@
     "PROMOTOR": "PROMOTOR"
   };
 
-  const PREFERRED_ORDER = [
-    "NRO_REGIS",
-    "PROYECTO",
-    "PROVINCIA",
-    "CANTÓN","CANTON",
-    "PARROQUIA",
-    "SECTOR",
-    "VIVIENDAS",
-    "TIPO_VIVIE",
-    "PROMOTOR_","PROMOTOR",
-    "CONTACTO",
-    "MAIL",
-    "WEB"
-  ];
+const PREFERRED_ORDER = [
+  "PROYECTO",
+  "PROVINCIA",
+  "CANTÓN","CANTON",
+  "PARROQUIA",
+  "SECTOR",
+  "PROMOTOR_","PROMOTOR",
+  "CONTACTO",
+  "MAIL",
+  "WEB"
+];
 
   function setStats(total, shown, prov, canton, q) {
     statsBox.innerHTML = `
@@ -424,11 +421,7 @@
       ordered.push(k);
     }
 
-    const extras = keysInProps
-      .filter(k => !PREFERRED_ORDER.includes(k))
-      .sort((a,b) => a.localeCompare(b));
-
-    const finalKeys = ordered.concat(extras);
+const finalKeys = ordered; // SOLO los campos permitidos
 
     const rows = finalKeys.map(k => {
       let label = (LABELS[k] || k).trim();
@@ -634,4 +627,5 @@
 </script>
 </body>
 </html>
+
 
