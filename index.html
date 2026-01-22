@@ -1,0 +1,46 @@
+<body>
+
+<div id="map"></div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+  // 1. Crear mapa centrado en Ecuador
+  var map = L.map('map').setView([-1.5, -78.5], 6);
+
+  // 2. Mapa base
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap'
+  }).addTo(map);
+
+  // 3. Cargar GeoJSON
+  fetch('miti_miti_proyectos.geojson')
+    .then(response => response.json())
+    .then(data => {
+
+      var capa = L.geoJSON(data, {
+        onEachFeature: function (feature, layer) {
+
+          var p = feature.properties;
+
+          var popup = `
+            <strong>Proyecto:</strong> ${p.PROYECTO || ''}<br>
+            <strong>Provincia:</strong> ${p.PROVINCIA || ''}<br>
+            <strong>Cantón:</strong> ${p.CANTÓN || ''}<br>
+            <strong>Registro:</strong> ${p.NRO_REGIS || ''}<br>
+            <strong>Contacto:</strong> ${p.CONTACTO || ''}<br>
+            <strong>Email:</strong> ${p.MAIL || ''}<br>
+            ${p.WEB ? `<a href="${p.WEB}" target="_blank">Página web</a>` : ''}
+          `;
+
+          layer.bindPopup(popup);
+        }
+      }).addTo(map);
+
+      map.fitBounds(capa.getBounds());
+    });
+</script>
+
+</body>
+</html>
