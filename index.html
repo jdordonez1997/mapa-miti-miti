@@ -5,29 +5,29 @@
   <title>PROYECTOS DE VIVIENDA MITI - MITI</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- Evita 404 de favicon -->
   <link rel="icon" href="data:," />
-
-  <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-
-  <!-- MarkerCluster -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
 
   <style>
     html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; }
 
-    .app { height: 100%; display: grid; grid-template-columns: 340px 1fr; }
+    .app {
+      height: 100%;
+      display: grid;
+      grid-template-columns: 340px 1fr 360px; /* izquierda - mapa - derecha */
+    }
 
     .panel {
       padding: 14px 14px 12px 14px;
-      border-right: 1px solid #ddd;
       background: #fff;
       overflow: auto;
     }
+    .panel.left { border-right: 1px solid #ddd; }
+    .panel.right { border-left: 1px solid #ddd; background: #fafafa; }
 
-    .header { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+    .header { display:flex; flex-direction:column; align-items:flex-start; gap:6px; margin-bottom:10px; }
     .header img { height: 38px; width: auto; display:block; }
 
     .panel h1 {
@@ -35,10 +35,10 @@
       margin: 0;
       font-weight: 700;
       text-transform: uppercase;
-      line-height: 1.2;
+      line-height: 1.25;
     }
 
-    .panel .muted {
+    .muted {
       color: #666;
       font-size: 12px;
       margin-bottom: 12px;
@@ -55,6 +55,7 @@
       font-size: 13px;
       outline: none;
       box-sizing: border-box;
+      background: #fff;
     }
 
     .btn {
@@ -101,14 +102,7 @@
 
     #map { height: 100%; }
 
-    /* Popup */
-    .popup-wrap { max-height: 260px; overflow: auto; }
-    .popup-title { font-weight: 700; margin: 0 0 6px 0; }
-    table.popup-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-    table.popup-table th { text-align: left; vertical-align: top; padding: 3px 6px 3px 0; white-space: nowrap; }
-    table.popup-table td { padding: 3px 0; word-break: break-word; }
-
-    /* Punto liviano */
+    /* Marker (divIcon) */
     .dot {
       width: 10px;
       height: 10px;
@@ -117,29 +111,97 @@
       border: 1px solid rgba(0,0,0,0.25);
       box-shadow: 0 1px 2px rgba(0,0,0,0.15);
     }
+    .dot.selected {
+      width: 12px;
+      height: 12px;
+      border: 2px solid rgba(0,0,0,0.35);
+      box-shadow: 0 2px 5px rgba(0,0,0,0.25);
+    }
 
-    @media (max-width: 820px) {
-      .app { grid-template-columns: 1fr; grid-template-rows: 290px 1fr; }
-      .panel { border-right: none; border-bottom: 1px solid #ddd; }
+    /* Panel derecho (detalle) */
+    .detail-card {
+      background: #fff;
+      border: 1px solid #e6e6e6;
+      border-radius: 12px;
+      padding: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    .detail-title {
+      font-size: 14px;
+      font-weight: 800;
+      margin: 0 0 10px 0;
+      line-height: 1.25;
+    }
+
+    .detail-actions {
+      display:flex;
+      gap:8px;
+      margin: 10px 0 0 0;
+    }
+
+    .mini-btn {
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid #222;
+      background: #fff;
+      color: #222;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
+      flex: 1;
+    }
+
+    table.detail-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    table.detail-table th {
+      text-align: left;
+      vertical-align: top;
+      padding: 5px 10px 5px 0;
+      white-space: nowrap;
+      color: #333;
+    }
+    table.detail-table td {
+      padding: 5px 0;
+      word-break: break-word;
+      color: #111;
+    }
+
+    .hint {
+      color:#666;
+      font-size: 12px;
+      line-height:1.35;
+    }
+
+    /* Responsive */
+    @media (max-width: 1100px) {
+      .app { grid-template-columns: 320px 1fr 320px; }
+    }
+    @media (max-width: 900px) {
+      /* En móvil apilamos: filtros arriba, mapa, detalle abajo */
+      .app { grid-template-columns: 1fr; grid-template-rows: 280px 1fr 260px; }
+      .panel.left { border-right: none; border-bottom: 1px solid #ddd; }
+      .panel.right { border-left: none; border-top: 1px solid #ddd; }
     }
   </style>
 </head>
+
 <body>
-
 <div class="app">
-  <div class="panel">
-    <div class="header" style="flex-direction:column; align-items:flex-start;">
-  <img id="logoInst"
-       src="logo_institucional.jpg"
-       alt="Logo institucional"
-       style="margin-bottom:6px;"
-       onerror="window.__logoFallback && window.__logoFallback(this);" />
 
-  <h1 style="margin:0; line-height:1.25;">
-    PROYECTOS DE VIVIENDA MITI - MITI
-  </h1>
-</div>
-    
+  <!-- PANEL IZQUIERDO -->
+  <div class="panel left">
+    <div class="header">
+      <img id="logoInst"
+           src="logo_institucional.jpg"
+           alt="Logo institucional"
+           onerror="window.__logoFallback && window.__logoFallback(this);" />
+      <h1>PROYECTOS DE VIVIENDA MITI - MITI</h1>
+    </div>
+
     <div class="muted">
       Filtra por provincia y cantón. La búsqueda aplica automáticamente mientras escribes.
     </div>
@@ -172,30 +234,39 @@
     </div>
   </div>
 
+  <!-- MAPA -->
   <div id="map"></div>
+
+  <!-- PANEL DERECHO (DETALLE) -->
+  <div class="panel right">
+    <h1 style="margin-bottom:10px;">DETALLE DEL PROYECTO</h1>
+
+    <div class="detail-card" id="detailCard">
+      <div class="hint">
+        Haz clic en un punto del mapa para ver aquí la información del proyecto.
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 
 <script>
-  // ====== FALLBACK DE LOGO (prueba varias rutas/formatos) ======
+  // ====== FALLBACK DE LOGO ======
   window.__logoFallback = (function(){
     const candidates = [
       "logo_institucional.jpg",
       "logo_institucional.jpeg",
       "logo_institucional.png",
       "logo_institucional.svg",
-      "logo_institucional"          // por si lo subiste sin extensión
+      "logo_institucional"
     ];
     let idx = 0;
     return function(img){
       idx++;
-      if (idx >= candidates.length) {
-        // Si no existe ningún logo, ocultamos el <img> para que no quede el ícono roto
-        img.style.display = "none";
-        return;
-      }
+      if (idx >= candidates.length) { img.style.display = "none"; return; }
       img.onerror = function(){ window.__logoFallback(img); };
       img.src = candidates[idx];
     };
@@ -230,9 +301,16 @@
   const clusterToggle = document.getElementById('clusterToggle');
   const statsBox = document.getElementById('statsBox');
 
+  const detailCard = document.getElementById('detailCard');
+
   // ====== ESTADO ======
   let allFeatures = [];
   let currentFiltered = [];
+
+  // Para resaltar el seleccionado
+  let selectedMarker = null;
+  const normalIcon = L.divIcon({ className: "", html: `<div class="dot"></div>`, iconSize: [10,10], iconAnchor: [5,5] });
+  const selectedIcon = L.divIcon({ className: "", html: `<div class="dot selected"></div>`, iconSize: [12,12], iconAnchor: [6,6] });
 
   // ====== UTIL ======
   function escapeHtml(s) {
@@ -241,9 +319,7 @@
     }[m]));
   }
 
-  function normalizeStr(s) {
-    return String(s ?? "").toUpperCase().trim();
-  }
+  function normalizeStr(s) { return String(s ?? "").toUpperCase().trim(); }
 
   function getProp(props, keys) {
     for (const k of keys) {
@@ -254,18 +330,9 @@
     return "";
   }
 
-  function getProvincia(props){
-    return getProp(props, ["PROVINCIA", "Provincia", "provincia"]);
-  }
-
-  function getCanton(props){
-    // Soporta con tilde y sin tilde
-    return getProp(props, ["CANTÓN", "CANTON", "Canton", "cantón", "canton"]);
-  }
-
-  function getPromotor(props){
-    return getProp(props, ["PROMOTOR_", "PROMOTOR", "PROMOTOR ", "PROMOTOR_ "]);
-  }
+  function getProvincia(props){ return getProp(props, ["PROVINCIA","Provincia","provincia"]); }
+  function getCanton(props){ return getProp(props, ["CANTÓN","CANTON","Canton","cantón","canton"]); }
+  function getPromotor(props){ return getProp(props, ["PROMOTOR_","PROMOTOR","PROMOTOR ","PROMOTOR_ "]); }
 
   function formatValue(keyLabel, val) {
     if (val === null || val === undefined) return "";
@@ -279,7 +346,7 @@
     return escapeHtml(s);
   }
 
-  // Etiquetas institucionales (bonitas)
+  // Etiquetas “bonitas”
   const LABELS = {
     "NRO_REGIS": "REGISTRO",
     "PROYECTO": "PROYECTO",
@@ -297,90 +364,20 @@
     "PROMOTOR": "PROMOTOR"
   };
 
-  // Orden preferido (pero luego añadimos cualquier otro campo que exista)
   const PREFERRED_ORDER = [
     "NRO_REGIS",
     "PROYECTO",
     "PROVINCIA",
-    "CANTÓN", "CANTON",
+    "CANTÓN","CANTON",
     "PARROQUIA",
     "SECTOR",
     "VIVIENDAS",
     "TIPO_VIVIE",
-    "PROMOTOR_", "PROMOTOR",
+    "PROMOTOR_","PROMOTOR",
     "CONTACTO",
     "MAIL",
     "WEB"
   ];
-
-  function buildPopupHTML(props) {
-    props = props || {};
-
-    const proyecto = getProp(props, ["PROYECTO", "Proyecto", "PROYECTO "]);
-    const title = proyecto ? escapeHtml(proyecto) : "Detalle";
-
-    // Construimos lista de claves: primero las preferidas, luego el resto
-    const keysInProps = Object.keys(props);
-    const used = new Set();
-
-    const ordered = [];
-    for (const k of PREFERRED_ORDER) {
-      // si la clave no existe, saltar
-      if (!(k in props)) continue;
-
-      // normalización para evitar duplicados PROMOTOR_/PROMOTOR, CANTÓN/CANTON
-      const norm =
-        (k === "PROMOTOR_" || k === "PROMOTOR") ? "PROMOTOR" :
-        (k === "CANTÓN" || k === "CANTON") ? "CANTON" :
-        k;
-
-      if (used.has(norm)) continue;
-      used.add(norm);
-      ordered.push(k);
-    }
-
-    // añadimos extras (cualquier campo que no haya entrado)
-    const extras = keysInProps
-      .filter(k => !PREFERRED_ORDER.includes(k))
-      .sort((a,b) => a.localeCompare(b));
-
-    const finalKeys = ordered.concat(extras);
-
-    // Generamos filas (con valor)
-    const rows = finalKeys.map(k => {
-      let label = (LABELS[k] || k).trim();
-
-      // Caso especial: PROMOTOR (toma de PROMOTOR_ / PROMOTOR)
-      if (label === "PROMOTOR") {
-        const val = getPromotor(props);
-        if (!String(val ?? "").trim()) return "";
-        return `<tr><th>${escapeHtml(label)}:</th><td>${formatValue(label, val)}</td></tr>`;
-      }
-
-      // Caso especial: CANTÓN (toma CANTÓN o CANTON)
-      if (label === "CANTÓN") {
-        const val = getCanton(props);
-        if (!String(val ?? "").trim()) return "";
-        return `<tr><th>${escapeHtml(label)}:</th><td>${formatValue(label, val)}</td></tr>`;
-      }
-
-      // Normal
-      const v = props[k];
-      if (v === null || v === undefined || String(v).trim() === "") return "";
-      return `<tr><th>${escapeHtml(label)}:</th><td>${formatValue(label, v)}</td></tr>`;
-    }).join("");
-
-    return `
-      <div class="popup-wrap">
-        <div class="popup-title">${title}</div>
-        <table class="popup-table">${rows}</table>
-      </div>
-    `;
-  }
-
-  function getUniqueSorted(arr) {
-    return Array.from(new Set(arr)).filter(Boolean).sort((a,b) => a.localeCompare(b));
-  }
 
   function setStats(total, shown, prov, canton, q) {
     statsBox.innerHTML = `
@@ -395,10 +392,102 @@
 
   function debounce(fn, ms) {
     let t = null;
-    return function(...args) {
-      clearTimeout(t);
-      t = setTimeout(() => fn.apply(this, args), ms);
-    };
+    return function(...args) { clearTimeout(t); t = setTimeout(() => fn.apply(this, args), ms); };
+  }
+
+  function getUniqueSorted(arr) {
+    return Array.from(new Set(arr)).filter(Boolean).sort((a,b) => a.localeCompare(b));
+  }
+
+  // ====== DETALLE A LA DERECHA ======
+  function renderDetail(props, markerLatLng) {
+    props = props || {};
+
+    const proyecto = getProp(props, ["PROYECTO","Proyecto","PROYECTO "]);
+    const title = proyecto ? escapeHtml(proyecto) : "Detalle del proyecto";
+
+    // Orden: preferidos, luego extras
+    const keysInProps = Object.keys(props);
+    const used = new Set();
+    const ordered = [];
+
+    for (const k of PREFERRED_ORDER) {
+      if (!(k in props)) continue;
+
+      const norm =
+        (k === "PROMOTOR_" || k === "PROMOTOR") ? "PROMOTOR" :
+        (k === "CANTÓN" || k === "CANTON") ? "CANTON" :
+        k;
+
+      if (used.has(norm)) continue;
+      used.add(norm);
+      ordered.push(k);
+    }
+
+    const extras = keysInProps
+      .filter(k => !PREFERRED_ORDER.includes(k))
+      .sort((a,b) => a.localeCompare(b));
+
+    const finalKeys = ordered.concat(extras);
+
+    const rows = finalKeys.map(k => {
+      let label = (LABELS[k] || k).trim();
+
+      if (label === "PROMOTOR") {
+        const val = getPromotor(props);
+        if (!String(val ?? "").trim()) return "";
+        return `<tr><th>${escapeHtml(label)}:</th><td>${formatValue(label, val)}</td></tr>`;
+      }
+
+      if (label === "CANTÓN") {
+        const val = getCanton(props);
+        if (!String(val ?? "").trim()) return "";
+        return `<tr><th>${escapeHtml(label)}:</th><td>${formatValue(label, val)}</td></tr>`;
+      }
+
+      const v = props[k];
+      if (v === null || v === undefined || String(v).trim() === "") return "";
+      return `<tr><th>${escapeHtml(label)}:</th><td>${formatValue(label, v)}</td></tr>`;
+    }).join("");
+
+    const lat = markerLatLng?.lat;
+    const lng = markerLatLng?.lng;
+
+    detailCard.innerHTML = `
+      <div class="detail-title">${title}</div>
+      <table class="detail-table">${rows}</table>
+
+      <div class="detail-actions">
+        <button class="mini-btn" id="btnCentrar">Centrar</button>
+        <button class="mini-btn" id="btnLimpiarSel">Quitar selección</button>
+      </div>
+    `;
+
+    // acciones
+    const btnCentrar = document.getElementById('btnCentrar');
+    const btnLimpiarSel = document.getElementById('btnLimpiarSel');
+
+    btnCentrar.addEventListener('click', () => {
+      if (typeof lat === "number" && typeof lng === "number") {
+        map.setView([lat, lng], Math.max(map.getZoom(), 13), { animate: true });
+      }
+    });
+
+    btnLimpiarSel.addEventListener('click', () => {
+      clearSelection();
+    });
+  }
+
+  function clearSelection() {
+    if (selectedMarker) {
+      selectedMarker.setIcon(normalIcon);
+      selectedMarker = null;
+    }
+    detailCard.innerHTML = `
+      <div class="hint">
+        Haz clic en un punto del mapa para ver aquí la información del proyecto.
+      </div>
+    `;
   }
 
   // ====== FILTROS ======
@@ -434,7 +523,6 @@
 
     const filtered = allFeatures.filter(f => {
       const p = f.properties || {};
-
       const fp = normalizeStr(getProvincia(p));
       const fc = normalizeStr(getCanton(p));
 
@@ -456,6 +544,7 @@
     currentFiltered = filtered;
     renderFeatures(filtered);
     setStats(allFeatures.length, filtered.length, prov, canton, q);
+    clearSelection();
   }
 
   function clearFilters() {
@@ -465,16 +554,10 @@
     currentFiltered = allFeatures;
     renderFeatures(allFeatures);
     setStats(allFeatures.length, allFeatures.length, "", "", "");
+    clearSelection();
   }
 
   // ====== RENDER ======
-  const dotIcon = L.divIcon({
-    className: "",
-    html: `<div class="dot"></div>`,
-    iconSize: [10,10],
-    iconAnchor: [5,5]
-  });
-
   function clearAllLayers() {
     plainLayer.clearLayers();
     clusterLayer.clearLayers();
@@ -484,6 +567,7 @@
 
   function renderFeatures(features) {
     clearAllLayers();
+
     const useCluster = clusterToggle.checked;
 
     for (const f of features) {
@@ -491,10 +575,17 @@
       if (!coords || coords.length < 2) continue;
 
       const lng = coords[0], lat = coords[1];
-      const marker = L.marker([lat, lng], { icon: dotIcon });
+      const marker = L.marker([lat, lng], { icon: normalIcon });
 
-      // Popup estable: se puede abrir/cerrar y reabrir siempre
-      marker.bindPopup(() => buildPopupHTML(f.properties || {}), { maxWidth: 420 })
+      marker.on('click', () => {
+        // resaltar seleccionado
+        if (selectedMarker && selectedMarker !== marker) selectedMarker.setIcon(normalIcon);
+        selectedMarker = marker;
+        marker.setIcon(selectedIcon);
+
+        // pintar panel derecho
+        renderDetail(f.properties || {}, marker.getLatLng());
+      });
 
       if (useCluster) clusterLayer.addLayer(marker);
       else plainLayer.addLayer(marker);
@@ -502,9 +593,7 @@
 
     if (useCluster) {
       map.addLayer(clusterLayer);
-      if (clusterLayer.getLayers().length) {
-        map.fitBounds(clusterLayer.getBounds(), { padding: [20, 20] });
-      }
+      if (clusterLayer.getLayers().length) map.fitBounds(clusterLayer.getBounds(), { padding: [20, 20] });
     } else {
       const bounds = L.latLngBounds([]);
       plainLayer.eachLayer(l => bounds.extend(l.getLatLng()));
@@ -524,7 +613,7 @@
   cantonSelect.addEventListener('change', function() { applyFilters(); });
   buscarInput.addEventListener('input', debounce(applyFilters, 250));
   limpiarBtn.addEventListener('click', function() { clearFilters(); });
-  clusterToggle.addEventListener('change', function() { renderFeatures(currentFiltered); });
+  clusterToggle.addEventListener('change', function() { renderFeatures(currentFiltered); clearSelection(); });
 
   // ====== CARGA DATOS ======
   fetch(DATA_URL)
@@ -543,8 +632,6 @@
       alert("No se pudo cargar el GeoJSON. Revisa el nombre del archivo en GitHub.");
     });
 </script>
-
 </body>
 </html>
-
 
