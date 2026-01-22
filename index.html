@@ -5,64 +5,118 @@
   <title>Proyectos Miti-Miti</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- Leaflet CSS -->
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
   />
 
   <style>
-    html, body {
-      height: 100%;
-      margin: 0;
-    }
-    #map {
-      width: 100%;
-      height: 100%;
-    }
+    html, body { height: 100%; margin: 0; }
+    #map { width: 100%; height: 100%; }
+
+    /* Popup liviano y legible */
+    .popup-wrap { max-height: 260px; overflow: auto; }
+    .popup-title { font-weight: 700; margin: 0 0 6px 0; }
+    table.popup-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    table.popup-table th { text-align: left; vertical-align: top; padding: 3px 6px 3px 0; white-space: nowrap; }
+    table.popup-table td { padding: 3px 0; word-break: break-word; }
   </style>
 </head>
 <body>
 
 <div id="map"></div>
 
-<!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-  // 1. Crear mapa centrado en Ecuador
-  var map = L.map('map').setView([-1.5, -78.5], 6);
+  // Mapa base
+  var map = L.map('map', { preferCanvas: true }).setView([-1.5, -78.5], 6);
 
-  // 2. Mapa base
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap'
   }).addTo(map);
 
-  // 3. Cargar GeoJSON
+  // Orden de campos (exactamente como tus propiedades)
+  var FIELD_ORDER = [
+    "NRO_REGIS", "PROVINCIA", "CANTÓN", "PARROQUIA", "SECTOR",
+    "PROYECTO", "VIVIENDAS", "TIPO_VIVIE", "PROMOTOR", "CONTACTO", "MAIL", "WEB"
+  ];
+
+  function escapeHtml(s) {
+    return String(s ?? "").replace(/[&<>"']/g, m => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[m]));
+  }
+
+  function formatValue(key, val) {
+    if (val === null || val === undefined || val === "") return "";
+    if (key === "WEB") {
+      var u = String(val).trim();
+      // si no tiene http(s), le anteponemos https://
+      if (u && !/^https?:\/\//i.test(u)) u = "https://" + u;
+      return `<a href="${escapeHtml(u)}" target="_blank" rel="noopener">${escapeHtml(u)}</a>`;
+    }
+    return escapeHtml(val);
+  }
+
+  function buildPopupHTML(props) {
+    props = props || {};
+
+    // título del popup (liviano)
+    var title = props.PROYECTO ? escapeHtml(props.PROYECTO) : "Detalle";
+
+    // tabla con TODOS los atributos (solo los que existan)
+    var rows = FIELD_ORDER.map(function (k) {
+      if (!(k in props)) return "";
+      var v = props[k];
+      if (v === null || v === undefined || v === "") return "";
+      return `<tr><th>${escapeHtml(k)}:</th><td>${formatValue(k, v)}</td></tr>`;
+    }).join("");
+
+    // Por si hubiera campos adicionales no listados (no debería, pero por seguridad)
+    var extras = Object.keys(props).filter(k => !FIELD_ORDER.includes(k)).map(function(k){
+      var v = props[k];
+      if (v === null || v === undefined || v === "") return "";
+      return `<tr><th>${escapeHtml(k)}:</th><td>${formatValue(k, v)}</td></tr>`;
+    }).join("");
+
+    return `
+      <div class="popup-wrap">
+        <div class="popup-title">${title}</div>
+        <table class="popup-table">
+          ${rows}${extras}
+        </table>
+      </div>
+    `;
+  }
+
   fetch('miti_miti_proyectos.geojson')
-    .then(response => response.json())
+    .then(r => r.json())
     .then(data => {
 
       var capa = L.geoJSON(data, {
+        // Marcador liviano (mejor rendimiento que pins)
+        pointToLayer: function (feature, latlng) {
+          return L.circleMarker(latlng, {
+            radius: 5,
+            weight: 1,
+            fillOpacity: 0.85
+          });
+        },
+        // Popup bajo demanda (solo al click)
         onEachFeature: function (feature, layer) {
-
-          var p = feature.properties;
-
-          var popup = `
-            <strong>Proyecto:</strong> ${p.PROYECTO || ''}<br>
-            <strong>Provincia:</strong> ${p.PROVINCIA || ''}<br>
-            <strong>Cantón:</strong> ${p.CANTÓN || ''}<br>
-            <strong>Registro:</strong> ${p.NRO_REGIS || ''}<br>
-            <strong>Contacto:</strong> ${p.CONTACTO || ''}<br>
-            <strong>Email:</strong> ${p.MAIL || ''}<br>
-            ${p.WEB ? `<a href="${p.WEB}" target="_blank">Página web</a>` : ''}
-          `;
-
-          layer.bindPopup(popup);
+          layer.on('click', function () {
+            var html = buildPopupHTML(feature.properties || {});
+            layer.bindPopup(html, { maxWidth: 420 }).openPopup();
+          });
         }
       }).addTo(map);
 
-      map.fitBounds(capa.getBounds());
+      map.fitBounds(capa.getBounds(), { padding: [20, 20] });
+    })
+    .catch(err => {
+      console.error("Error cargando el GeoJSON:", err);
+      alert("No se pudo cargar el GeoJSON. Revisa que el archivo exista en el repo y que el nombre coincida.");
     });
 </script>
 
