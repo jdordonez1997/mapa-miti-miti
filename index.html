@@ -493,9 +493,8 @@
       const lng = coords[0], lat = coords[1];
       const marker = L.marker([lat, lng], { icon: dotIcon });
 
-      marker.on('click', () => {
-        marker.bindPopup(buildPopupHTML(f.properties || {}), { maxWidth: 420 }).openPopup();
-      });
+      // Popup estable: se puede abrir/cerrar y reabrir siempre
+      marker.bindPopup(() => buildPopupHTML(f.properties || {}), { maxWidth: 420 })
 
       if (useCluster) clusterLayer.addLayer(marker);
       else plainLayer.addLayer(marker);
@@ -547,4 +546,5 @@
 
 </body>
 </html>
+
 
