@@ -128,15 +128,18 @@
 
 <div class="app">
   <div class="panel">
-    <div class="header">
-      <!-- Logo con fallback automático (por si está sin extensión o con otra) -->
-      <img id="logoInst"
-           src="logo_institucional.jpg"
-           alt="Logo institucional"
-           onerror="window.__logoFallback && window.__logoFallback(this);" />
-      <h1>PROYECTOS DE VIVIENDA MITI - MITI</h1>
-    </div>
+    <div class="header" style="flex-direction:column; align-items:flex-start;">
+  <img id="logoInst"
+       src="logo_institucional.jpg"
+       alt="Logo institucional"
+       style="margin-bottom:6px;"
+       onerror="window.__logoFallback && window.__logoFallback(this);" />
 
+  <h1 style="margin:0; line-height:1.25;">
+    PROYECTOS DE VIVIENDA MITI - MITI
+  </h1>
+</div>
+    
     <div class="muted">
       Filtra por provincia y cantón. La búsqueda aplica automáticamente mientras escribes.
     </div>
@@ -544,3 +547,4 @@
 
 </body>
 </html>
+
