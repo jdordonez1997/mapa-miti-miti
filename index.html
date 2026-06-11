@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <title>PROYECTOS DE VIVIENDA MITI - MITI</title>
+  <title>PROYECTOS DE VIVIENDA VIS - VIP</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="icon" href="data:," />
@@ -11,10 +11,13 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
 
   <style>
+    * { box-sizing: border-box; }
+
     html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; }
 
     .app {
       height: 100%;
+      width: 100%;
       display: grid;
       grid-template-columns: 340px 1fr 360px; /* izquierda - mapa - derecha */
     }
@@ -181,10 +184,24 @@
       .app { grid-template-columns: 320px 1fr 320px; }
     }
     @media (max-width: 900px) {
-      /* En móvil apilamos: filtros arriba, mapa, detalle abajo */
-      .app { grid-template-columns: 1fr; grid-template-rows: 280px 1fr 260px; }
+      html, body { height: auto; min-height: 100%; overflow: auto; }
+      .app {
+        height: auto;
+        min-height: 100dvh;
+        display: flex;
+        flex-direction: column;
+      }
+      .panel { overflow: visible; }
       .panel.left { border-right: none; border-bottom: 1px solid #ddd; }
-      .panel.right { border-left: none; border-top: 1px solid #ddd; }
+      .panel.right { border-left: none; border-top: 1px solid #ddd; min-height: 180px; }
+      #map { height: clamp(320px, 48vh, 520px); min-height: 320px; flex: none; }
+    }
+
+    @media (max-width: 520px) {
+      .panel { padding: 12px; }
+      .panel h1 { font-size: 14px; }
+      #map { height: 340px; min-height: 340px; }
+      table.detail-table th { white-space: normal; }
     }
   </style>
 </head>
@@ -199,12 +216,19 @@
            src="logo_institucional.jpg"
            alt="Logo institucional"
            onerror="window.__logoFallback && window.__logoFallback(this);" />
-      <h1>PROYECTOS DE VIVIENDA MITI - MITI</h1>
+      <h1>PROYECTOS DE VIVIENDA VIS - VIP</h1>
     </div>
 
     <div class="muted">
-      Filtra por provincia y cantón. La búsqueda aplica automáticamente mientras escribes.
+      Filtra por tipo de vivienda, provincia y cantón. La búsqueda aplica automáticamente mientras escribes.
     </div>
+
+    <label for="tipoSelect">Tipo de vivienda</label>
+    <select id="tipoSelect">
+      <option value="">(Todas)</option>
+      <option value="VIS">VIS</option>
+      <option value="VIP">VIP</option>
+    </select>
 
     <label for="provinciaSelect">Provincia</label>
     <select id="provinciaSelect">
@@ -226,11 +250,11 @@
 
     <button class="btn secondary" id="limpiarBtn">Limpiar</button>
 
-    <div class="stats" id="statsBox">Cargando datos…</div>
+    <div class="stats" id="statsBox">Cargando datos...</div>
 
     <div class="footer">
-      <strong>Fuente:</strong> Registro de Viviendas del Programa Miti-Miti – Ministerio de Infraestructura y Transporte.<br>
-      <strong>Actualización:</strong> <span id="fechaActualizacion">2026-01-21</span>
+      <strong>Fuente:</strong> Registro VIS VIP publicado en Google Sheets.<br>
+      <strong>Actualización:</strong> <span id="fechaActualizacion">Automática al abrir</span>
     </div>
   </div>
 
@@ -273,15 +297,16 @@
   })();
 
   // ====== CONFIG ======
-  const DATA_URL = 'miti_miti_proyectos.geojson';
-  const FECHA_ACTUALIZACION = '2026-01-21';
+  const SHEET_ID = '107ZMNZpjswuc-SBBeXvcOxGfr5bxj3c9Rk3B8zT8wN0';
+  const SHEET_GID = '0';
+  const FECHA_ACTUALIZACION = new Date().toLocaleDateString('es-EC');
   document.getElementById('fechaActualizacion').textContent = FECHA_ACTUALIZACION;
 
   // ====== MAPA ======
   const map = L.map('map', { preferCanvas: true }).setView([-1.5, -78.5], 6);
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap'
+    attribution: '&copy; OpenStreetMap'
   }).addTo(map);
 
   let plainLayer = L.layerGroup().addTo(map);
@@ -294,6 +319,7 @@
   });
 
   // ====== UI ======
+  const tipoSelect = document.getElementById('tipoSelect');
   const provinciaSelect = document.getElementById('provinciaSelect');
   const cantonSelect = document.getElementById('cantonSelect');
   const buscarInput = document.getElementById('buscarInput');
@@ -319,7 +345,13 @@
     }[m]));
   }
 
-  function normalizeStr(s) { return String(s ?? "").toUpperCase().trim(); }
+  function normalizeStr(s) {
+    return String(s ?? "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toUpperCase()
+      .trim();
+  }
 
   function getProp(props, keys) {
     for (const k of keys) {
@@ -330,9 +362,16 @@
     return "";
   }
 
+  function getTipo(props){ return getProp(props, ["TIPO DE VIVIENDA","TIPO_VIVIE","Tipo de vivienda"]); }
+  function getProyecto(props){ return getProp(props, ["NOMBRE DEL PROYECTO","PROYECTO","Proyecto","PROYECTO "]); }
   function getProvincia(props){ return getProp(props, ["PROVINCIA","Provincia","provincia"]); }
   function getCanton(props){ return getProp(props, ["CANTÓN","CANTON","Canton","cantón","canton"]); }
-  function getPromotor(props){ return getProp(props, ["PROMOTOR_","PROMOTOR","PROMOTOR ","PROMOTOR_ "]); }
+  function getRegistro(props){ return getProp(props, ["NRO DE REGISTRO","NRO DE REGISTRO ","NRO_REGIS","NRO_REG","REGISTRO","Registro"]); }
+  function getWeb(props){ return getProp(props, ["PAGINA WEB","WEB","Web","web"]); }
+  function getSector(props){ return getProp(props, ["SECTOR","SECTOR "]); }
+  function getPromotor(props){ return getProp(props, ["PROMOTOR/ CONSTRUCTOR","PROMOTOR_","PROMOTOR","PROMOTOR ","PROMOTOR_ "]); }
+  function getContacto(props){ return getProp(props, ["CONTACTO PROMOTOR/CONSTRUCTOR","CONTACTO"]); }
+  function getEmail(props){ return getProp(props, ["CONTACTO ELECTRONICO PROMOTOR/CONSTRUCTOR","MAIL","EMAIL"]); }
 
   function formatValue(keyLabel, val) {
     if (val === null || val === undefined) return "";
@@ -346,40 +385,24 @@
     return escapeHtml(s);
   }
 
-  // Etiquetas “bonitas”
-  const LABELS = {
-    "NRO_REGIS": "REGISTRO",
-    "PROYECTO": "PROYECTO",
-    "PROVINCIA": "PROVINCIA",
-    "CANTÓN": "CANTÓN",
-    "CANTON": "CANTÓN",
-    "PARROQUIA": "PARROQUIA",
-    "SECTOR": "SECTOR",
-    "VIVIENDAS": "VIVIENDAS",
-    "TIPO_VIVIE": "TIPO VIVIENDA",
-    "CONTACTO": "CONTACTO",
-    "MAIL": "EMAIL",
-    "WEB": "WEB",
-    "PROMOTOR_": "PROMOTOR",
-    "PROMOTOR": "PROMOTOR"
-  };
+  const DETAIL_FIELDS = [
+    { label: "TIPO DE VIVIENDA", get: getTipo },
+    { label: "PROYECTO", get: getProyecto },
+    { label: "PROVINCIA", get: getProvincia },
+    { label: "CANTÓN", get: getCanton },
+    { label: "PARROQUIA", get: props => getProp(props, ["PARROQUIA"]) },
+    { label: "SECTOR", get: getSector },
+    { label: "WEB", get: getWeb },
+    { label: "PROMOTOR", get: getPromotor },
+    { label: "CONTACTO", get: getContacto },
+    { label: "EMAIL", get: getEmail }
+  ];
 
-const PREFERRED_ORDER = [
-  "PROYECTO",
-  "PROVINCIA",
-  "CANTÓN","CANTON",
-  "PARROQUIA",
-  "SECTOR",
-  "PROMOTOR_","PROMOTOR",
-  "CONTACTO",
-  "MAIL",
-  "WEB"
-];
-
-  function setStats(total, shown, prov, canton, q) {
+  function setStats(total, shown, tipo, prov, canton, q) {
     statsBox.innerHTML = `
       <strong>Total:</strong> ${total.toLocaleString()}<br>
       <strong>Mostrando:</strong> ${shown.toLocaleString()}<br>
+      <strong>Tipo:</strong> ${tipo || "(Todas)"}<br>
       <strong>Provincia:</strong> ${prov || "(Todas)"}<br>
       <strong>Cantón:</strong> ${canton || "(Todos)"}<br>
       <strong>Búsqueda:</strong> ${q ? escapeHtml(q) : "(Ninguna)"}<br>
@@ -396,49 +419,22 @@ const PREFERRED_ORDER = [
     return Array.from(new Set(arr)).filter(Boolean).sort((a,b) => a.localeCompare(b));
   }
 
+  function featureHasValue(feature, fieldName, value) {
+    if (!value) return true;
+    const values = feature.properties?.__FILTERS?.[fieldName] || [];
+    return values.includes(value);
+  }
+
   // ====== DETALLE A LA DERECHA ======
   function renderDetail(props, markerLatLng) {
     props = props || {};
 
-    const proyecto = getProp(props, ["PROYECTO","Proyecto","PROYECTO "]);
+    const proyecto = getProyecto(props);
     const title = proyecto ? escapeHtml(proyecto) : "Detalle del proyecto";
 
-    // Orden: preferidos, luego extras
-    const keysInProps = Object.keys(props);
-    const used = new Set();
-    const ordered = [];
-
-    for (const k of PREFERRED_ORDER) {
-      if (!(k in props)) continue;
-
-      const norm =
-        (k === "PROMOTOR_" || k === "PROMOTOR") ? "PROMOTOR" :
-        (k === "CANTÓN" || k === "CANTON") ? "CANTON" :
-        k;
-
-      if (used.has(norm)) continue;
-      used.add(norm);
-      ordered.push(k);
-    }
-
-const finalKeys = ordered; // SOLO los campos permitidos
-
-    const rows = finalKeys.map(k => {
-      let label = (LABELS[k] || k).trim();
-
-      if (label === "PROMOTOR") {
-        const val = getPromotor(props);
-        if (!String(val ?? "").trim()) return "";
-        return `<tr><th>${escapeHtml(label)}:</th><td>${formatValue(label, val)}</td></tr>`;
-      }
-
-      if (label === "CANTÓN") {
-        const val = getCanton(props);
-        if (!String(val ?? "").trim()) return "";
-        return `<tr><th>${escapeHtml(label)}:</th><td>${formatValue(label, val)}</td></tr>`;
-      }
-
-      const v = props[k];
+    const rows = DETAIL_FIELDS.map(field => {
+      const label = field.label;
+      const v = field.get(props);
       if (v === null || v === undefined || String(v).trim() === "") return "";
       return `<tr><th>${escapeHtml(label)}:</th><td>${formatValue(label, v)}</td></tr>`;
     }).join("");
@@ -485,15 +481,19 @@ const finalKeys = ordered; // SOLO los campos permitidos
 
   // ====== FILTROS ======
   function populateProvincias() {
-    const provs = getUniqueSorted(allFeatures.map(f => normalizeStr(getProvincia(f.properties || {}))));
+    const tipo = tipoSelect.value ? normalizeStr(tipoSelect.value) : "";
+    const provs = getUniqueSorted(allFeatures
+      .filter(f => featureHasValue(f, "tipo", tipo))
+      .flatMap(f => f.properties?.__FILTERS?.provincia || []));
     provinciaSelect.innerHTML = `<option value="">(Todas)</option>` +
       provs.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join("");
   }
 
   function populateCantones(prov) {
+    const tipo = tipoSelect.value ? normalizeStr(tipoSelect.value) : "";
     let cantones = allFeatures
-      .filter(f => normalizeStr(getProvincia(f.properties || {})) === prov)
-      .map(f => normalizeStr(getCanton(f.properties || {})));
+      .filter(f => featureHasValue(f, "tipo", tipo) && featureHasValue(f, "provincia", prov))
+      .flatMap(f => f.properties?.__FILTERS?.canton || []);
 
     cantones = getUniqueSorted(cantones);
 
@@ -509,6 +509,7 @@ const finalKeys = ordered; // SOLO los campos permitidos
   }
 
   function applyFilters() {
+    const tipo = tipoSelect.value ? normalizeStr(tipoSelect.value) : "";
     const prov = provinciaSelect.value ? normalizeStr(provinciaSelect.value) : "";
     const canton = (!cantonSelect.disabled && cantonSelect.value) ? normalizeStr(cantonSelect.value) : "";
     const q = buscarInput.value ? buscarInput.value.trim() : "";
@@ -516,16 +517,16 @@ const finalKeys = ordered; // SOLO los campos permitidos
 
     const filtered = allFeatures.filter(f => {
       const p = f.properties || {};
-      const fp = normalizeStr(getProvincia(p));
-      const fc = normalizeStr(getCanton(p));
 
-      if (prov && fp !== prov) return false;
-      if (canton && fc !== canton) return false;
+      if (!featureHasValue(f, "tipo", tipo)) return false;
+      if (!featureHasValue(f, "provincia", prov)) return false;
+      if (!featureHasValue(f, "canton", canton)) return false;
 
       if (qn) {
         const haystack = [
           getProp(p, ["PROYECTO","Proyecto","PROYECTO "]),
-          getProp(p, ["NRO_REGIS","NRO_REG","REGISTRO","Registro"]),
+          getProyecto(p),
+          getProp(p, ["NRO DE REGISTRO","NRO DE REGISTRO ","NRO_REGIS","NRO_REG","REGISTRO","Registro"]),
           getPromotor(p)
         ].map(x => normalizeStr(x)).join(" | ");
 
@@ -536,17 +537,18 @@ const finalKeys = ordered; // SOLO los campos permitidos
 
     currentFiltered = filtered;
     renderFeatures(filtered);
-    setStats(allFeatures.length, filtered.length, prov, canton, q);
+    setStats(allFeatures.length, filtered.length, tipo, prov, canton, q);
     clearSelection();
   }
 
   function clearFilters() {
+    tipoSelect.value = "";
     provinciaSelect.value = "";
     buscarInput.value = "";
     clearCantones();
     currentFiltered = allFeatures;
     renderFeatures(allFeatures);
-    setStats(allFeatures.length, allFeatures.length, "", "", "");
+    setStats(allFeatures.length, allFeatures.length, "", "", "", "");
     clearSelection();
   }
 
@@ -595,6 +597,13 @@ const finalKeys = ordered; // SOLO los campos permitidos
   }
 
   // ====== EVENTOS ======
+  tipoSelect.addEventListener('change', function() {
+    provinciaSelect.value = "";
+    clearCantones();
+    populateProvincias();
+    applyFilters();
+  });
+
   provinciaSelect.addEventListener('change', function() {
     const prov = provinciaSelect.value ? normalizeStr(provinciaSelect.value) : "";
     if (!prov) { clearCantones(); applyFilters(); return; }
@@ -608,22 +617,153 @@ const finalKeys = ordered; // SOLO los campos permitidos
   limpiarBtn.addEventListener('click', function() { clearFilters(); });
   clusterToggle.addEventListener('change', function() { renderFeatures(currentFiltered); clearSelection(); });
 
-  // ====== CARGA DATOS ======
-  fetch(DATA_URL)
-    .then(r => r.json())
-    .then(data => {
-      allFeatures = data.features || [];
+  // ====== GOOGLE SHEETS ======
+  function normalizeHeader(label, index, used) {
+    let key = String(label || `COLUMNA_${index + 1}`).trim();
+    if (!key) key = `COLUMNA_${index + 1}`;
+
+    if (used[key]) {
+      used[key] += 1;
+      key = `${key} ${used[key]}`;
+    } else {
+      used[key] = 1;
+    }
+
+    return key;
+  }
+
+  function parseCoordinate(value) {
+    if (value === null || value === undefined) return NaN;
+    const cleaned = String(value).trim().replace(",", ".");
+    if (!cleaned) return NaN;
+    return Number(cleaned);
+  }
+
+  function isPublishableRow(props) {
+    const coord = normalizeStr(getProp(props, ["COORDENADA VERIFICADA"]));
+    const disponibles = normalizeStr(getProp(props, ["VIVIENDAS DISPONIBLES"]));
+    return coord === "SI" && (disponibles === "SI" || disponibles === "POR VERIFICAR");
+  }
+
+  function getValidCoordinates(props) {
+    const x = parseCoordinate(getProp(props, ["X"]));
+    const y = parseCoordinate(getProp(props, ["Y"]));
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    if (x < -82 || x > -74) return null;
+    if (y < -6 || y > 2) return null;
+    return { lng: x, lat: y };
+  }
+
+  function isValidProjectRow(props) {
+    return isPublishableRow(props) && !!getValidCoordinates(props);
+  }
+
+  function buildFeatureFromRow(props) {
+    if (!isPublishableRow(props)) return null;
+
+    const coords = getValidCoordinates(props);
+    if (!coords) return null;
+
+    return {
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [coords.lng, coords.lat] },
+      properties: props
+    };
+  }
+
+  function buildFeatureFromGroup(registro, rows) {
+    const validRows = rows.filter(isValidProjectRow);
+    if (!validRows.length) return null;
+
+    const avg = validRows.reduce((acc, props) => {
+      const coords = getValidCoordinates(props);
+      acc.lng += coords.lng;
+      acc.lat += coords.lat;
+      return acc;
+    }, { lng: 0, lat: 0 });
+
+    const lng = avg.lng / validRows.length;
+    const lat = avg.lat / validRows.length;
+    const props = {
+      ...validRows[0],
+      "__REGISTRO_GRUPO": registro,
+      "__FILTERS": {
+        tipo: getUniqueSorted(validRows.map(p => normalizeStr(getTipo(p)))),
+        provincia: getUniqueSorted(validRows.map(p => normalizeStr(getProvincia(p)))),
+        canton: getUniqueSorted(validRows.map(p => normalizeStr(getCanton(p))))
+      }
+    };
+
+    return {
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [lng, lat] },
+      properties: props
+    };
+  }
+
+  function groupRowsByRegistro(rows) {
+    const groups = new Map();
+
+    for (const props of rows) {
+      const registro = normalizeStr(getRegistro(props));
+      if (!registro) continue;
+      if (!groups.has(registro)) groups.set(registro, []);
+      groups.get(registro).push(props);
+    }
+
+    return groups;
+  }
+
+  function sheetTableToFeatures(table) {
+    const usedHeaders = {};
+    const headers = (table.cols || []).map((col, index) => normalizeHeader(col.label || col.id, index, usedHeaders));
+    const rows = (table.rows || [])
+      .map(row => {
+        const props = {};
+        headers.forEach((header, index) => {
+          const cell = row.c && row.c[index];
+          props[header] = cell ? (cell.f ?? cell.v ?? "") : "";
+        });
+        return props;
+      });
+
+    return Array.from(groupRowsByRegistro(rows).entries())
+      .map(([registro, groupedRows]) => buildFeatureFromGroup(registro, groupedRows))
+      .filter(Boolean);
+  }
+
+  window.googleSheetLoaded = function(response) {
+    try {
+      if (!response || response.status === "error") {
+        throw new Error(response?.errors?.[0]?.message || "Respuesta no valida de Google Sheets");
+      }
+
+      allFeatures = sheetTableToFeatures(response.table || {});
       currentFiltered = allFeatures;
 
       populateProvincias();
       renderFeatures(allFeatures);
-      setStats(allFeatures.length, allFeatures.length, "", "", "");
-    })
-    .catch(err => {
+      setStats(allFeatures.length, allFeatures.length, "", "", "", "");
+    } catch (err) {
       console.error(err);
-      statsBox.textContent = "Error cargando el GeoJSON. Verifica el nombre del archivo y que esté en la raíz del repo.";
-      alert("No se pudo cargar el GeoJSON. Revisa el nombre del archivo en GitHub.");
-    });
+      statsBox.textContent = "Error procesando los datos de Google Sheets. Verifica que la hoja sea publica y que las columnas X/Y tengan coordenadas.";
+      alert("No se pudieron procesar los datos de Google Sheets.");
+    }
+  };
+
+  function loadGoogleSheet() {
+    const script = document.createElement("script");
+    const tqx = encodeURIComponent("out:json;responseHandler:googleSheetLoaded");
+    script.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=${tqx}&gid=${SHEET_GID}&t=${Date.now()}`;
+    script.onerror = () => {
+      statsBox.textContent = "Error cargando Google Sheets. Verifica que la hoja sea publica.";
+      alert("No se pudo cargar Google Sheets.");
+    };
+    document.body.appendChild(script);
+  }
+
+  loadGoogleSheet();
+
 </script>
 </body>
 </html>
