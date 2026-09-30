@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>PROYECTOS DE VIVIENDA VIS - VIP</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
+
+  <style>
+    * { box-sizing: border-box; }
+
+    html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; }
+
+    .app {
+      height: 100%;
+      width: 100%;
+      display: grid;
+      grid-template-columns: 340px minmax(0, 1fr) 400px;
+    }
+
+    .panel {
+      padding: 14px 14px 12px 14px;
+      background: #fff;
+      overflow: auto;
+    }
+    .panel.left { border-right: 1px solid #ddd; }
+    .panel.right { border-left: 1px solid #ddd; background: #fafafa; }
+
+    .header { display:flex; flex-direction:column; align-items:flex-start; gap:6px; margin-bottom:10px; }
+    .header img { height: 38px; width: auto; display:block; }
+
+    .panel h1 {
+      font-size: 16px;
+      margin: 0;
+      font-weight: 700;
+      text-transform: uppercase;
+      line-height: 1.25;
+    }
+
+    .muted {
+      color: #666;
+      font-size: 12px;
+      margin-bottom: 12px;
+      line-height: 1.3;
+    }
+
+    label { display:block; font-size:12px; margin:10px 0 6px 0; font-weight:700; }
+
+    select, input {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 13px;
+      outline: none;
+      box-sizing: border-box;
+      background: #fff;
+    }
+
+    .btn {
+      margin-top: 10px;
+      width: 100%;
+      padding: 9px 10px;
+      border: 1px solid #222;
+      background: #222;
+      color: white;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .btn.secondary { background:#fff; color:#222; }
+
+    .stats {
+      margin-top: 10px;
+      font-size: 12px;
+      color: #333;
+      padding: 10px;
+      border-radius: 10px;
+      background: #f6f6f6;
+      line-height: 1.4;
+    }
+
+    .footer {
+      margin-top: 12px;
+      font-size: 11px;
+      color: #666;
+      line-height: 1.35;
+    }
+
+    .toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+      font-size: 12px;
+      color: #222;
+      user-select: none;
+    }
+    .toggle input { width: auto; }
+    .price-filter { border: 0; margin: 14px 0 0; padding: 0; min-width: 0; }
+    .price-filter legend { padding: 0; font-size: 12px; font-weight: 700; }
+    .price-inputs { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+    .price-inputs label { font-weight: 400; color: #62697c; margin-top: 8px; }
+    .filter-note { margin: 7px 0 0; font-size: 11px; line-height: 1.4; color: #687086; }
+    .filter-error { color: #b42318; margin: 7px 0 0; font-size: 12px; line-height: 1.4; }
+    .panel.left :focus-visible { outline: 2px solid #3831a0; outline-offset: 2px; }
+
+    #map { height: 100%; }
+
+    /* Marker (divIcon) */
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #2E7DF6;
+      border: 1px solid rgba(0,0,0,0.25);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+    }
+    .dot.selected {
+      width: 12px;
+      height: 12px;
+      border: 2px solid rgba(0,0,0,0.35);
+      box-shadow: 0 2px 5px rgba(0,0,0,0.25);
+    }
+
+    /* Panel derecho (detalle) */
+    .panel.right { background: #f4f5fa; padding: 18px 14px; }
+    .panel.right > h1 { color: #7b8298; font-size: 11px; letter-spacing: 1.2px; margin: 0 4px 14px !important; }
+    .detail-card {
+      background: #fff;
+      border: 1px solid #e9eaf2;
+      border-radius: 22px;
+      overflow: hidden;
+      box-shadow: 0 10px 28px rgba(36, 31, 96, .09);
+    }
+    .project-header { padding: 22px 20px 18px; background: #3831a0; border-bottom: 5px solid #ffc928; color: #fff; }
+    .availability-button { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; margin-top: 10px; padding: 6px 0; border: 0; border-radius: 4px; color: #e2dff5; background: transparent; font: 400 11px/1.4 Arial, sans-serif; text-align: left; cursor: pointer; }
+    .availability-button:hover { color: #fff; text-decoration: underline; text-underline-offset: 3px; }
+    .availability-button svg { width: 12px; height: 12px; flex: none; }
+    .availability-message { font: 12px/1.5 Arial, sans-serif; margin: 10px 0 0; }
+    .availability-message:empty { display: none; }
+    .data-actions { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 10px; }
+    .data-actions button { padding: 3px 0; border: 0; background: none; color: #3831a0; font: 600 11px Arial, sans-serif; text-decoration: underline; cursor: pointer; }
+    #availabilityStatus { font-size: 11px; color: #715716; }
+    .project-eyebrow { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 9px; }
+    .project-eyebrow span:first-child { font-size: 10px; font-weight: 800; letter-spacing: 1.1px; }
+    .project-type { font-size: 10px; font-weight: 800; padding: 4px 8px; border: 1px solid #ffffff55; border-radius: 6px; }
+    .detail-title { font-family: Impact, 'Arial Narrow', Arial, sans-serif; font-size: 24px; font-weight: 400; font-synthesis: none; letter-spacing: .5px; margin: 0; line-height: 1.2; text-transform: uppercase; overflow-wrap: anywhere; }
+    .project-body { padding: 22px 19px 18px; }
+    .project-photos { margin: 0 0 22px; }
+    .project-photos[hidden] { display: none; }
+    .project-photo-status { font: 12px/1.5 Arial, sans-serif; color: #77819b; margin: 0 0 10px; }
+    .project-photo-cover { display: block; width: 100%; padding: 0; border: 0; border-radius: 12px; overflow: hidden; cursor: zoom-in; background: #f1f0fa; }
+    .project-photo-cover img { display: block; width: 100%; aspect-ratio: 3/2; object-fit: cover; }
+    .project-photo-thumbs { display: flex; gap: 8px; margin-top: 8px; }
+    .project-photo-thumbs[hidden] { display: none; }
+    .project-photo-thumbs button { width: 62px; height: 45px; padding: 0; border: 2px solid transparent; border-radius: 7px; overflow: hidden; cursor: pointer; background: #f1f0fa; }
+    .project-photo-thumbs button[aria-pressed="true"] { border-color: #3831a0; }
+    .project-photo-thumbs img { display: block; width: 100%; height: 100%; object-fit: cover; }
+    .photo-lightbox { width: min(960px, 94vw); max-height: 94vh; padding: 16px; border: 0; border-radius: 18px; background: #fff; box-shadow: 0 16px 70px #131c3570; }
+    .photo-lightbox::backdrop { background: #131c35bf; }
+    .photo-lightbox img { display: block; width: 100%; max-height: 72vh; object-fit: contain; background: #f4f5fa; border-radius: 10px; }
+    .photo-lightbox-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+    .photo-lightbox-controls button { padding: 9px 12px; border: 1px solid #e3e0f0; border-radius: 8px; background: #f1f0fa; color: #3831a0; cursor: pointer; }
+    .photo-lightbox-controls span { flex: 1; color: #68718b; font-size: 12px; }
+    .project-facts { margin: 0; display: grid; gap: 15px; }
+    .project-row { display: grid; grid-template-columns: 29px minmax(0, 1fr); gap: 10px; align-items: start; }
+    .project-icon { display: flex; align-items: center; justify-content: center; width: 29px; height: 29px; border-radius: 9px; background: #f0f0f9; color: #3831a0; }
+    .project-icon svg { width: 15px; height: 15px; }
+    .project-row dt { color: #77819b; font-size: 10px; font-weight: 800; letter-spacing: .25px; line-height: 1.3; margin: 0 0 3px; text-transform: uppercase; }
+    .project-row dd { color: #131c35; font-size: 13px; font-weight: 700; line-height: 1.45; margin: 0; overflow-wrap: anywhere; }
+    .project-row a { color: #3831a0; text-decoration: none; }
+    .project-row a:hover { text-decoration: underline; }
+    .project-coordinates { font-family: Consolas, monospace; font-size: 12px; font-weight: 500; }
+    .project-more { margin-top: 17px; border-top: 1px solid #eeeef5; padding-top: 12px; }
+    .project-more summary { color: #3831a0; font-size: 12px; font-weight: 700; cursor: pointer; }
+    .project-more .project-facts { margin-top: 15px; }
+    .project-price { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 16px 14px; margin-top: 18px; border-radius: 16px; background: #fff8e4; }
+    .project-price span { color: #886612; font-size: 10px; font-weight: 800; line-height: 1.5; text-transform: uppercase; }
+    .project-price strong { color: #3831a0; font-family: Impact, 'Arial Narrow', Arial, sans-serif; font-size: 23px; font-weight: 400; font-synthesis: none; letter-spacing: .25px; white-space: nowrap; }
+    .project-clear { display: block; margin: 13px auto 0; padding: 5px; color: #77819b; border: 0; background: none; font-size: 11px; cursor: pointer; }
+    .project-clear:hover { color: #3831a0; }
+    .mortgage-toggle { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 14px; padding: 11px 12px; border: 1px solid #d9d6ed; border-radius: 11px; background: #f1f0fa; color: #3831a0; font: 700 12px Arial, sans-serif; cursor: pointer; }
+    .mortgage-toggle:hover { background: #e8e5f8; }
+    .mortgage-toggle svg { width: 16px; height: 16px; }
+    .mortgage-panel { margin-top: 12px; border: 1px solid #e9e7f4; border-radius: 14px; padding: 15px; background: #faf9fe; }
+    .mortgage-panel[hidden] { display: none; }
+    .mortgage-panel h3 { margin: 0 0 5px; color: #3831a0; font-size: 14px; }
+    .mortgage-note { margin: 6px 0 12px; color: #737b92; font-size: 11px; line-height: 1.5; }
+    .mortgage-terms { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+    .mortgage-terms span { padding: 5px 7px; border-radius: 6px; background: #efedf9; color: #3831a0; font-size: 10px; }
+    .mortgage-breakdown { margin: 0; display: grid; gap: 8px; }
+    .mortgage-breakdown div { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; }
+    .mortgage-breakdown dt { color: #737b92; }
+    .mortgage-breakdown dd { color: #202541; font-weight: 700; margin: 0; }
+    .mortgage-payment { border-radius: 12px; background: #3831a0; color: white; padding: 14px; margin-top: 14px; }
+    .mortgage-payment span { display: block; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; }
+    .mortgage-payment strong { display: block; font-family: Impact, 'Arial Narrow', Arial, sans-serif; font-weight: 400; font-synthesis: none; font-size: 28px; letter-spacing: .4px; margin: 6px 0 3px; }
+    .mortgage-payment small { display: block; color: #594713; background: #fff8e4; border-left: 3px solid #ffc928; border-radius: 8px; padding: 10px 11px; font-size: 12px; font-weight: 600; line-height: 1.55; margin-top: 12px; }
+    .mortgage-method { margin: 10px 0 0; color: #737b92; font-size: 10px; line-height: 1.5; }
+    .detail-card :focus-visible { outline: 3px solid #e9b000; outline-offset: 3px; }
+    .hint { padding: 28px 22px; color: #77819b; font-size: 13px; line-height: 1.6; }
+
+    /* Filtros: misma línea gráfica que la ficha del proyecto. */
+    .panel.left { background: #f4f5fa; padding: 18px 14px; border-color: #e9eaf2; scrollbar-width: thin; scrollbar-color: #c9c6e3 #f4f5fa; }
+    .sidebar-caption { color: #7b8298; font-size: 11px; font-weight: 700; letter-spacing: 1.2px; margin: 0 4px 14px; text-transform: uppercase; }
+    .filter-card { background: #fff; border: 1px solid #e9eaf2; border-radius: 22px; overflow: hidden; box-shadow: 0 10px 28px rgba(36,31,96,.09); }
+    .filter-card .header { display: block; margin: 0; padding: 20px 18px 18px; color: #fff; background: #3831a0; border-bottom: 5px solid #ffc928; }
+    .filter-card .header img { max-width: 100%; object-fit: contain; margin-bottom: 10px; }
+    .filter-eyebrow { display: flex; align-items: center; gap: 7px; margin-bottom: 9px; font-size: 10px; font-weight: 800; letter-spacing: 1.1px; }
+    .filter-eyebrow svg { width: 13px; height: 13px; flex: none; }
+    .panel.left .header h1 { font-family: Impact, 'Arial Narrow', Arial, sans-serif; font-weight: 400; font-synthesis: none; font-size: 23px; letter-spacing: .5px; line-height: 1.2; }
+    .filter-body { padding: 18px 16px; }
+    .filter-body .muted { color: #77819b; font-size: 12px; line-height: 1.5; margin-bottom: 17px; }
+    .filter-body > label { margin: 13px 0 6px; color: #77819b; font-size: 10px; font-weight: 800; letter-spacing: .35px; text-transform: uppercase; }
+    .filter-body select, .filter-body input:not([type="checkbox"]) { min-height: 38px; padding: 9px 10px; background: #f8f8fc; border: 1px solid #e3e3ef; border-radius: 10px; color: #202541; font-family: Arial, sans-serif; font-size: 12px; transition: border-color .15s, background .15s; }
+    .filter-body select:hover, .filter-body input:not([type="checkbox"]):hover { border-color: #b9b4de; }
+    .filter-body select:focus, .filter-body input:not([type="checkbox"]):focus { border-color: #3831a0; background: #fff; }
+    .filter-body select:disabled { color: #969bb0; background: #f4f5f8; border-color: #ececf2; cursor: not-allowed; }
+    .filter-body input::placeholder { color: #9298ab; }
+    .filter-body .price-filter { background: #fff8e4; border-radius: 14px; padding: 13px 11px 12px; margin-top: 18px; }
+    .filter-body .price-filter legend { float: left; width: 100%; color: #886612; font-size: 10px; font-weight: 800; letter-spacing: .3px; text-transform: uppercase; margin-bottom: 2px; }
+    .filter-body .price-inputs { clear: both; gap: 8px; }
+    .filter-body .price-inputs label { color: #806d3e; font-size: 10px; font-weight: 600; }
+    .filter-body .price-inputs input { background: #fffdf7; border-color: #eee4c9; min-width: 0; padding: 9px 7px; }
+    .filter-body .filter-note { color: #8c7d58; font-size: 10px; line-height: 1.5; }
+    .filter-body .toggle { margin-top: 16px; color: #626a82; }
+    .filter-body .toggle label { color: #626a82; font-size: 11px; }
+    .filter-body .toggle input { accent-color: #3831a0; width: 15px; height: 15px; margin: 0; }
+    .filter-body .btn.secondary { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 16px; min-height: 38px; border: 1px solid #d9d6ed; border-radius: 11px; background: #f1f0fa; color: #3831a0; font-size: 12px; }
+    .filter-body .btn.secondary:hover { background: #e8e5f8; border-color: #b9b4de; }
+    .filter-body .btn svg { width: 14px; height: 14px; }
+    .filter-body .stats { margin-top: 18px; padding: 13px; border: 1px solid #e9e7f4; border-radius: 14px; background: #faf9fe; color: #737b92; font-size: 11px; line-height: 1.65; overflow-wrap: anywhere; }
+    .filter-body .stats strong { color: #3831a0; font-weight: 700; }
+    .panel.left .footer { margin: 16px 6px 2px; color: #858ba0; font-size: 10px; line-height: 1.6; }
+    .panel.left .footer strong { color: #68718b; }
+
+    /* Responsive */
+    @media (max-width: 1100px) {
+      .app { grid-template-columns: 280px minmax(0, 1fr) 340px; }
+    }
+    @media (max-width: 900px) {
+      html, body { height: auto; min-height: 100%; overflow: auto; }
+      .app {
+        height: auto;
+        min-height: 100dvh;
+        display: flex;
+        flex-direction: column;
+      }
+      .panel { overflow: visible; }
+      .panel.left { border-right: none; border-bottom: 1px solid #ddd; }
+      .panel.right { border-left: none; border-top: 1px solid #ddd; min-height: 180px; }
+      #map { height: clamp(320px, 48vh, 520px); min-height: 320px; flex: none; }
+    }
+
+    @media (max-width: 520px) {
+      .panel { padding: 12px; }
+      .panel h1 { font-size: 14px; }
+      #map { height: 340px; min-height: 340px; }
+      .project-price strong { font-size: 21px; }
+    }
+  </style>
+</head>
+
+<body>
+<div class="app">
+
+  <!-- PANEL IZQUIERDO -->
+  <div class="panel left">
+    <div class="sidebar-caption">Explorar proyectos</div>
+    <div class="filter-card">
+    <div class="header">
+      <img id="logoInst"
+           src="logo_institucional.jpg"
+           alt="Logo institucional"
+           onerror="window.__logoFallback && window.__logoFallback(this);" />
+      <div class="filter-eyebrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>GEOVISOR VIS · VIP</div>
+      <h1>PROYECTOS DE VIVIENDA</h1>
+    </div>
+
+    <div class="filter-body">
+    <div class="muted">
+      Filtra por tipo, segmento, ubicación y precio. Los filtros se aplican automáticamente.
+    </div>
+
+    <label for="tipoSelect">Tipo de vivienda</label>
+    <select id="tipoSelect">
+      <option value="">(Todas)</option>
+      <option value="VIS">VIS</option>
+      <option value="VIP">VIP</option>
+    </select>
+
+    <label for="provinciaSelect">Provincia</label>
+    <select id="provinciaSelect">
+      <option value="">(Todas)</option>
+    </select>
+
+    <label for="cantonSelect">Cantón</label>
+    <select id="cantonSelect" disabled>
+      <option value="">(Todos)</option>
+    </select>
+
+    <label for="segmentoSelect">Segmento</label>
+    <select id="segmentoSelect">
+      <option value="">(Todos)</option>
+    </select>
+
+    <fieldset class="price-filter" aria-describedby="precioAyuda precioError">
+      <legend>Rango de precios (USD)</legend>
+      <div class="price-inputs">
+        <div><label for="precioMin">Precio mínimo</label><input id="precioMin" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Sin mínimo"></div>
+        <div><label for="precioMax">Precio máximo</label><input id="precioMax" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Sin máximo"></div>
+      </div>
+      <p id="precioAyuda" class="filter-note">Según el precio promedio por vivienda de la tarjeta. Puedes dejar un límite vacío.</p>
+      <p id="precioError" class="filter-error" role="status" hidden></p>
+    </fieldset>
+
+    <label for="buscarInput">Buscar (proyecto / promotor / registro)</label>
+    <input id="buscarInput" type="text" placeholder="Ej: Galilea, MIDUVI..., Los Prados..." />
+
+    <div class="toggle">
+      <input type="checkbox" id="clusterToggle" checked />
+      <label for="clusterToggle" style="margin:0; font-weight:700;">Agrupar puntos (clúster)</label>
+    </div>
+
+    <button class="btn secondary" id="limpiarBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10a9 9 0 1 1 2 8M3 4v6h6"/></svg>Limpiar</button>
+
+    <div class="stats" id="statsBox">Cargando datos...</div>
+    </div>
+    </div>
+
+    <div class="footer">
+      <strong>Fuente:</strong> Registro VIS VIP publicado en Google Sheets.<br>
+      <strong>Actualización:</strong> <span id="fechaActualizacion">Automática al abrir</span>
+      <div class="data-actions"><button type="button" id="refreshData">Actualizar datos</button><button type="button" id="promoterAccess">Acceso para promotores</button></div>
+      <p id="availabilityStatus" role="status" aria-live="polite"></p>
+    </div>
+  </div>
+
+  <!-- MAPA -->
+  <div id="map"></div>
+
+  <!-- PANEL DERECHO (DETALLE) -->
+  <div class="panel right">
+    <h1 style="margin-bottom:10px;">DETALLE DEL PROYECTO</h1>
+
+    <div class="detail-card" id="detailCard">
+      <div class="hint">
+        Haz clic en un punto del mapa para ver aquí la información del proyecto.
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="config.js"></script>
+<script src="availability.js"></script>
+<script src="photos.js"></script>
+
+<script>
+  // ====== FALLBACK DE LOGO ======
+  window.__logoFallback = (function(){
+    const candidates = [
+      "logo_institucional.jpg",
+      "logo_institucional.jpeg",
+      "logo_institucional.png",
+      "logo_institucional.svg",
+      "logo_institucional"
+    ];
+    let idx = 0;
+    return function(img){
+      idx++;
+      if (idx >= candidates.length) { img.style.display = "none"; return; }
+      img.onerror = function(){ window.__logoFallback(img); };
+      img.src = candidates[idx];
+    };
+  })();
+
+  // ====== CONFIG ======
+  const SHEET_ID = '107ZMNZpjswuc-SBBeXvcOxGfr5bxj3c9Rk3B8zT8wN0';
+  const SHEET_GID = '0';
+  const FECHA_ACTUALIZACION = new Date().toLocaleDateString('es-EC');
+  document.getElementById('fechaActualizacion').textContent = FECHA_ACTUALIZACION;
+
+  // ====== MAPA ======
+  const map = L.map('map', { preferCanvas: true }).setView([-1.5, -78.5], 6);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap'
+  }).addTo(map);
+
+  let plainLayer = L.layerGroup().addTo(map);
+  let clusterLayer = L.markerClusterGroup({
+    chunkedLoading: true,
+    removeOutsideVisibleBounds: true,
+    spiderfyOnMaxZoom: true,
+    showCoverageOnHover: false,
+    maxClusterRadius: 45
+  });
+
+  // ====== UI ======
+  const tipoSelect = document.getElementById('tipoSelect');
+  const provinciaSelect = document.getElementById('provinciaSelect');
+  const cantonSelect = document.getElementById('cantonSelect');
+  const segmentoSelect = document.getElementById('segmentoSelect');
+  const precioMin = document.getElementById('precioMin');
+  const precioMax = document.getElementById('precioMax');
+  const precioError = document.getElementById('precioError');
+  const buscarInput = document.getElementById('buscarInput');
+  const limpiarBtn = document.getElementById('limpiarBtn');
+  const clusterToggle = document.getElementById('clusterToggle');
+  const statsBox = document.getElementById('statsBox');
+
+  const detailCard = document.getElementById('detailCard');
+
+  // ====== ESTADO ======
+  let allFeatures = [];
+  let currentFiltered = [];
+
+  // Para resaltar el seleccionado
+  let selectedMarker = null;
+  const normalIcon = L.divIcon({ className: "", html: `<div class="dot"></div>`, iconSize: [10,10], iconAnchor: [5,5] });
+  const selectedIcon = L.divIcon({ className: "", html: `<div class="dot selected"></div>`, iconSize: [12,12], iconAnchor: [6,6] });
+
+  // ====== UTIL ======
+  function escapeHtml(s) {
+    return String(s ?? "").replace(/[&<>"']/g, m => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[m]));
+  }
+
+  function normalizeStr(s) {
+    return String(s ?? "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toUpperCase()
+      .trim();
+  }
+
+  function getProp(props, keys) {
+    for (const k of keys) {
+      if (k in props && props[k] !== null && props[k] !== undefined && String(props[k]).trim() !== "") {
+        return props[k];
+      }
+    }
+    return "";
+  }
+
+  function getTipo(props){ return getProp(props, ["TIPO DE VIVIENDA","TIPO_VIVIE","Tipo de vivienda"]); }
+  function getSegmento(props) { return normalizeStr(getProp(props, ['SEGMENTO DESTINADO', 'SEGMENTO'])).replace(/^TERCERO$/, 'TERCER').replace(/^SEGUNDO TERR\. PROM\.?$/, 'SEGUNDO'); }
+  function segmentLabel(value) {
+    return ({PRIMER:'Primer segmento', SEGUNDO:'Segundo segmento', TERCER:'Tercer segmento', CUARTO:'Cuarto segmento', 'PRIMER TUPE':'Primer segmento · TUPE'})[value] || value;
+  }
+  function getProyecto(props){ return getProp(props, ["NOMBRE DEL PROYECTO","PROYECTO","Proyecto","PROYECTO "]); }
+  function getProvincia(props){ return getProp(props, ["PROVINCIA","Provincia","provincia"]); }
+  function getCanton(props){ return getProp(props, ["CANTÓN","CANTON","Canton","cantón","canton"]); }
+  function getRegistro(props){ return getProp(props, ["NRO DE REGISTRO","NRO DE REGISTRO ","NRO_REGIS","NRO_REG","REGISTRO","Registro"]); }
+  function getWeb(props){ return getProp(props, ["PAGINA WEB","WEB","Web","web"]); }
+  function getSector(props){ return getProp(props, ["SECTOR","SECTOR "]); }
+  function getPromotor(props){ return getProp(props, ["PROMOTOR/ CONSTRUCTOR","PROMOTOR_","PROMOTOR","PROMOTOR ","PROMOTOR_ "]); }
+  function getContacto(props){ return getProp(props, ["CONTACTO PROMOTOR/CONSTRUCTOR","CONTACTO"]); }
+  function getEmail(props){ return getProp(props, ["CONTACTO ELECTRONICO PROMOTOR/CONSTRUCTOR","MAIL","EMAIL"]); }
+
+  function formatValue(keyLabel, val) {
+    if (val === null || val === undefined) return "";
+    const s = String(val).trim();
+    if (!s) return "";
+    if (keyLabel === "WEB") {
+      let u = s;
+      if (u && !/^https?:\/\//i.test(u)) u = "https://" + u;
+      return `<a href="${escapeHtml(u)}" target="_blank" rel="noopener">${escapeHtml(u)}</a>`;
+    }
+    return escapeHtml(s);
+  }
+
+  const CARD_ICONS = {
+    homes: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 7h1m4 0h1M9 11h1m4 0h1M9 15h1m4 0h1M10 21v-3h4v3"/>',
+    home: '<path d="m3 11 9-8 9 8M5 10v11h14V10M9 21v-7h6v7"/>',
+    phone: '<path d="M8 3H4a1 1 0 0 0-1 1c0 9 8 17 17 17a1 1 0 0 0 1-1v-4l-5-2-2 2a15 15 0 0 1-6-6l2-2-2-5Z"/>',
+    mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 6 9 7 9-7"/>',
+    pin: '<path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z"/><circle cx="12" cy="10" r="2"/>',
+    target: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1"/>',
+    info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/>'
+  };
+
+  function cardRow(icon, label, content) {
+    if (!content) return '';
+    return `<div class="project-row"><span class="project-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${CARD_ICONS[icon] || CARD_ICONS.info}</svg></span><div><dt>${escapeHtml(label)}</dt><dd>${content}</dd></div></div>`;
+  }
+
+  function projectSummary(props) {
+    const rows = props.__PROJECT_ROWS || [props];
+    const quantities = rows.map(p => p['NRO DE VIVIENDAS']);
+    const prices = rows.map(p => p['PRECIO DE VENTA']);
+    const hasCounts = quantities.every(n => typeof n === 'number' && Number.isFinite(n) && n >= 0);
+    const homes = hasCounts ? quantities.reduce((a, b) => a + b, 0) : null;
+    const hasPrices = prices.every(n => typeof n === 'number' && Number.isFinite(n) && n >= 0);
+    const price = hasCounts && hasPrices && homes > 0 ? prices.reduce((sum, p, i) => sum + p * quantities[i], 0) / homes : null;
+    return { homes, price };
+  }
+
+  // Tasa nominal anual fija proporcionada para esta simulación.
+  function calculateMortgage(homePrice) {
+    if (!Number.isFinite(homePrice) || homePrice <= 0) return null;
+    const downPayment = Math.round(homePrice * 0.05 * 100) / 100;
+    const principal = Math.round((homePrice - downPayment) * 100) / 100;
+    const monthlyRate = 0.0499 / 12;
+    const months = 30 * 12;
+    const payment = principal * monthlyRate / (1 - Math.pow(1 + monthlyRate, -months));
+    return { downPayment, principal, payment, months };
+  }
+
+  function setupMortgageCalculator(homePrice) {
+    const toggle = document.getElementById('mortgageToggle');
+    const panel = document.getElementById('mortgagePanel');
+    const result = document.getElementById('mortgageResult');
+    const money = value => new Intl.NumberFormat('es-EC', {style:'currency', currency:'USD'}).format(value);
+    function update() {
+      const values = calculateMortgage(homePrice);
+      if (!values) { result.innerHTML = '<p class="mortgage-note">Este proyecto no tiene un precio disponible para calcular la cuota.</p>'; return; }
+      result.innerHTML = `<dl class="mortgage-breakdown"><div><dt>Precio promedio de vivienda</dt><dd>${money(homePrice)}</dd></div><div><dt>Entrada (5%)</dt><dd>${money(values.downPayment)}</dd></div><div><dt>Monto a financiar (95%)</dt><dd>${money(values.principal)}</dd></div><div><dt>Número de cuotas</dt><dd>${values.months} mensuales</dd></div></dl><div class="mortgage-payment"><span>Cuota mensual aproximada</span><strong>${money(values.payment)}</strong><small>La cuota es aproximada. No incluye el costo de seguros ni otros gastos. El valor definitivo debe validarse con cada entidad financiera.</small></div><p class="mortgage-method">Sistema francés · Tasa nominal anual fija del 4,99%, dividida entre 12 para el cálculo mensual.</p>`;
+    }
+    toggle.addEventListener('click', () => {
+      const open = panel.hidden;
+      panel.hidden = !open;
+      toggle.setAttribute('aria-expanded', String(open));
+      document.getElementById('mortgageToggleText').textContent = open ? 'Ocultar cálculo' : 'Calcular cuota aproximada';
+      if (open) update();
+    });
+  }
+
+  function projectWeb(value) {
+    const raw = String(value || '').trim();
+    if (!raw || /\s/.test(raw)) return '';
+    try {
+      const url = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
+      if (!['https:', 'http:'].includes(url.protocol) || !url.hostname.includes('.') || url.username || url.password) return '';
+      return `<a href="${escapeHtml(url.href)}" target="_blank" rel="noopener noreferrer">Visitar sitio web ↗</a>`;
+    } catch { return ''; }
+  }
+
+  function setStats(total, shown, tipo, prov, canton, q, segmento = '', min = null, max = null) {
+    const money = n => new Intl.NumberFormat('es-EC', {style:'currency', currency:'USD'}).format(n);
+    const priceText = min === null && max === null ? '(Todos)' : min !== null && max !== null ? `${money(min)} a ${money(max)}` : min !== null ? `Desde ${money(min)}` : `Hasta ${money(max)}`;
+    statsBox.innerHTML = `
+      <strong>Total:</strong> ${total.toLocaleString()}<br>
+      <strong>Mostrando:</strong> ${shown.toLocaleString()}<br>
+      <strong>Tipo:</strong> ${escapeHtml(tipo || "(Todas)")}<br>
+      <strong>Provincia:</strong> ${escapeHtml(prov || "(Todas)")}<br>
+      <strong>Cantón:</strong> ${escapeHtml(canton || "(Todos)")}<br>
+      <strong>Segmento:</strong> ${escapeHtml(segmento ? segmentLabel(segmento) : '(Todos)')}<br>
+      <strong>Precio promedio:</strong> ${escapeHtml(priceText)}<br>
+      <strong>Búsqueda:</strong> ${q ? escapeHtml(q) : "(Ninguna)"}<br>
+      <strong>Actualización:</strong> ${escapeHtml(FECHA_ACTUALIZACION)}
+    `;
+  }
+
+  function debounce(fn, ms) {
+    let t = null;
+    return function(...args) { clearTimeout(t); t = setTimeout(() => fn.apply(this, args), ms); };
+  }
+
+  function getUniqueSorted(arr) {
+    return Array.from(new Set(arr)).filter(Boolean).sort((a,b) => a.localeCompare(b));
+  }
+
+  function featureHasValue(feature, fieldName, value) {
+    if (!value) return true;
+    const values = feature.properties?.__FILTERS?.[fieldName] || [];
+    return values.includes(value);
+  }
+
+  // ====== DETALLE A LA DERECHA ======
+  function availableHomesText(props, total) {
+    const update = Availability.get(getRegistro(props));
+    if (update?.state === 'NO') return '0';
+    const count = update?.availableHomes;
+    if (update?.state === 'SI' && Number.isSafeInteger(count) && count > 0) {
+      if (total !== null && count > total) return '';
+      return count.toLocaleString('es-EC') + (total === null ? '' : ' de ' + total.toLocaleString('es-EC'));
+    }
+    return '';
+  }
+  function renderDetail(props, markerLatLng) {
+    props = props || {};
+    const title = escapeHtml(getProyecto(props) || 'Detalle del proyecto');
+    const lat = markerLatLng?.lat;
+    const lng = markerLatLng?.lng;
+    const summary = projectSummary(props);
+    const projectTotal = Object.prototype.hasOwnProperty.call(props, '__TOTAL_HOMES') ? props.__TOTAL_HOMES : summary.homes;
+    const location = [getCanton(props), getProvincia(props)].filter(Boolean).join(', ');
+    const email = String(getEmail(props) || '').trim();
+    const emailContent = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+      ? `<a href="mailto:${escapeHtml(encodeURIComponent(email))}">${escapeHtml(email)}</a>` : escapeHtml(email);
+    const contact = String(getContacto(props) || '').trim();
+    const phoneContent = /^\+?[\d\s()-]+$/.test(contact) && contact.replace(/\D/g, '').length <= 15
+      ? `<a href="tel:${escapeHtml(contact.replace(/[^\d+]/g, ''))}">${escapeHtml(contact)}</a>` : escapeHtml(contact);
+    const coordinates = Number.isFinite(lat) && Number.isFinite(lng)
+      ? `<span class="project-coordinates">${lat.toFixed(6)}, ${lng.toFixed(6)}</span>` : '';
+    const rows = [
+      cardRow('homes', 'Viviendas disponibles', availableHomesText(props, projectTotal)),
+      cardRow('home', 'Promotor / constructor', escapeHtml(getPromotor(props))),
+      cardRow('phone', 'Teléfono', phoneContent),
+      cardRow('mail', 'Correo electrónico', emailContent),
+      cardRow('pin', 'Ubicación', escapeHtml(location)),
+      cardRow('target', 'Coordenadas', coordinates)
+    ].join('');
+    const extraRows = [
+      cardRow('info', 'Segmento', escapeHtml(getUniqueSorted((props.__PROJECT_ROWS || [props]).map(getSegmento)).map(segmentLabel).join(', '))),
+      cardRow('info', 'Disponibilidad de viviendas', escapeHtml(getProp(props, ['VIVIENDAS DISPONIBLES']))),
+      cardRow('pin', 'Parroquia', escapeHtml(getProp(props, ['PARROQUIA']))),
+      cardRow('pin', 'Sector', escapeHtml(getSector(props))),
+      cardRow('info', 'Página web', projectWeb(getWeb(props)))
+    ].join('');
+    const price = summary.price === null ? '' : `<div class="project-price" title="Promedio ponderado por el número de viviendas de las filas publicadas de este registro"><span>Precio promedio<br>de vivienda</span><strong>${new Intl.NumberFormat('es-EC', {style:'currency', currency:'USD', minimumFractionDigits:2, maximumFractionDigits:2}).format(summary.price)}</strong></div>`;
+    detailCard.innerHTML = `
+      <div class="project-header">
+        <div class="project-eyebrow"><span>PROYECTO DE VIVIENDA</span>${getTipo(props) ? `<span class="project-type">${escapeHtml(getTipo(props))}</span>` : ''}</div>
+        <h2 class="detail-title">${title}</h2>
+        <button type="button" class="availability-button" id="updateAvailability"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M13 5l6 6M4 20l4-1 12-12a2 2 0 0 0-4-4L4 15z"/></svg>Actualizar disponibilidad de vivienda</button>
+        <p class="availability-message" id="projectAvailabilityMessage" role="status"></p>
+      </div>
+      <div class="project-body">
+        <section id="projectPhotos" class="project-photos" aria-label="Fotografías del proyecto" hidden></section>
+        <dl class="project-facts">${rows}</dl>
+        ${extraRows ? `<details class="project-more"><summary>Más información del proyecto</summary><dl class="project-facts">${extraRows}</dl></details>` : ''}
+        ${price}
+        <button class="mortgage-toggle" id="mortgageToggle" type="button" aria-expanded="false" aria-controls="mortgagePanel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M8 6h8M8 10h1m6 0h1M8 14h1m6 0h1M8 18h1m6 0h1"/></svg><span id="mortgageToggleText">Calcular cuota aproximada</span></button>
+        <section class="mortgage-panel" id="mortgagePanel" aria-labelledby="mortgageTitle" hidden>
+          <h3 id="mortgageTitle">CRÉDITO MITI-MITI</h3>
+          <div class="mortgage-terms"><span>Entrada: 5%</span><span>Interés anual: 4,99%</span><span>Plazo: 30 años</span></div>
+          <div id="mortgageResult" aria-live="polite" aria-atomic="true"></div>
+        </section>
+        <button class="project-clear" id="btnLimpiarSel" type="button">Quitar selección</button>
+      </div>
+    `;
+
+    // acciones
+    ProjectPhotos.render(document.getElementById('projectPhotos'), props.__REGISTRO_GRUPO || getRegistro(props), getProyecto(props));
+    document.getElementById('updateAvailability').addEventListener('click', () => {
+      if (!Availability.open(props.__REGISTRO_GRUPO || getRegistro(props))) {
+        document.getElementById('projectAvailabilityMessage').textContent = Availability.setupMessage;
+      }
+    });
+    setupMortgageCalculator(summary.price === null ? null : Number(summary.price.toFixed(2)));
+    const btnLimpiarSel = document.getElementById('btnLimpiarSel');
+
+    btnLimpiarSel.addEventListener('click', () => {
+      clearSelection();
+    });
+  }
+
+  function clearSelection() {
+    if (selectedMarker) {
+      selectedMarker.setIcon(normalIcon);
+      selectedMarker = null;
+    }
+    detailCard.innerHTML = `
+      <div class="hint">
+        Haz clic en un punto del mapa para ver aquí la información del proyecto.
+      </div>
+    `;
+  }
+
+  // ====== FILTROS ======
+  function populateSegmentos() {
+    const selected = segmentoSelect.value;
+    const order = ['PRIMER', 'PRIMER TUPE', 'SEGUNDO', 'TERCER', 'CUARTO'];
+    const segments = getUniqueSorted(allFeatures.flatMap(f => f.properties.__FILTERS.segmento || []));
+    segments.sort((a, b) => (order.includes(a) ? order.indexOf(a) : 99) - (order.includes(b) ? order.indexOf(b) : 99) || a.localeCompare(b));
+    segmentoSelect.innerHTML = '<option value="">(Todos)</option>' + segments.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(segmentLabel(s))}</option>`).join('');
+    segmentoSelect.value = segments.includes(selected) ? selected : '';
+  }
+
+  function readPriceRange() {
+    const min = precioMin.value === '' ? null : precioMin.valueAsNumber;
+    const max = precioMax.value === '' ? null : precioMax.valueAsNumber;
+    const invalid = !precioMin.validity.valid || !precioMax.validity.valid || [min, max].some(n => n !== null && (!Number.isFinite(n) || n < 0));
+    const reversed = !invalid && min !== null && max !== null && min > max;
+    precioError.hidden = !invalid && !reversed;
+    precioError.textContent = invalid ? 'Introduce precios válidos, desde 0 y con hasta dos decimales. Se mantienen los resultados anteriores.' : reversed ? 'El mínimo no puede superar al máximo. Se mantienen los resultados anteriores.' : '';
+    precioMin.setAttribute('aria-invalid', String(!precioMin.validity.valid || reversed));
+    precioMax.setAttribute('aria-invalid', String(!precioMax.validity.valid || reversed));
+    return { min, max, valid: !invalid && !reversed };
+  }
+
+  function matchesPriceRange(props, min, max) {
+    if (min === null && max === null) return true;
+    const price = projectSummary(props).price;
+    if (price === null) return false;
+    const rounded = Math.round((price + Number.EPSILON) * 100) / 100;
+    return (min === null || rounded >= min) && (max === null || rounded <= max);
+  }
+
+  function populateProvincias() {
+    const tipo = tipoSelect.value ? normalizeStr(tipoSelect.value) : "";
+    const provs = getUniqueSorted(allFeatures
+      .filter(f => featureHasValue(f, "tipo", tipo))
+      .flatMap(f => f.properties?.__FILTERS?.provincia || []));
+    provinciaSelect.innerHTML = `<option value="">(Todas)</option>` +
+      provs.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join("");
+  }
+
+  function populateCantones(prov) {
+    const tipo = tipoSelect.value ? normalizeStr(tipoSelect.value) : "";
+    let cantones = allFeatures
+      .filter(f => featureHasValue(f, "tipo", tipo) && featureHasValue(f, "provincia", prov))
+      .flatMap(f => f.properties?.__FILTERS?.canton || []);
+
+    cantones = getUniqueSorted(cantones);
+
+    cantonSelect.innerHTML = `<option value="">(Todos)</option>` +
+      cantones.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
+
+    cantonSelect.disabled = false;
+  }
+
+  function clearCantones() {
+    cantonSelect.innerHTML = `<option value="">(Todos)</option>`;
+    cantonSelect.disabled = true;
+  }
+
+  function applyFilters() {
+    const range = readPriceRange();
+    if (!range.valid) return;
+    const segmento = segmentoSelect.value;
+    const tipo = tipoSelect.value ? normalizeStr(tipoSelect.value) : "";
+    const prov = provinciaSelect.value ? normalizeStr(provinciaSelect.value) : "";
+    const canton = (!cantonSelect.disabled && cantonSelect.value) ? normalizeStr(cantonSelect.value) : "";
+    const q = buscarInput.value ? buscarInput.value.trim() : "";
+    const qn = normalizeStr(q);
+
+    const filtered = allFeatures.filter(f => {
+      const p = f.properties || {};
+
+      if (!featureHasValue(f, "tipo", tipo)) return false;
+      if (!featureHasValue(f, "provincia", prov)) return false;
+      if (!featureHasValue(f, "canton", canton)) return false;
+      if (!featureHasValue(f, 'segmento', segmento)) return false;
+      if (!matchesPriceRange(p, range.min, range.max)) return false;
+
+      if (qn) {
+        const haystack = [
+          getProp(p, ["PROYECTO","Proyecto","PROYECTO "]),
+          getProyecto(p),
+          getProp(p, ["NRO DE REGISTRO","NRO DE REGISTRO ","NRO_REGIS","NRO_REG","REGISTRO","Registro"]),
+          getPromotor(p)
+        ].map(x => normalizeStr(x)).join(" | ");
+
+        if (!haystack.includes(qn)) return false;
+      }
+      return true;
+    });
+
+    currentFiltered = filtered;
+    renderFeatures(filtered);
+    setStats(allFeatures.length, filtered.length, tipo, prov, canton, q, segmento, range.min, range.max);
+    clearSelection();
+  }
+
+  function clearFilters() {
+    tipoSelect.value = "";
+    provinciaSelect.value = "";
+    buscarInput.value = "";
+    segmentoSelect.value = '';
+    precioMin.value = '';
+    precioMax.value = '';
+    populateProvincias();
+    clearCantones();
+    applyFilters();
+  }
+
+  // ====== RENDER ======
+  function clearAllLayers() {
+    plainLayer.clearLayers();
+    clusterLayer.clearLayers();
+    if (map.hasLayer(clusterLayer)) map.removeLayer(clusterLayer);
+    if (!map.hasLayer(plainLayer)) plainLayer.addTo(map);
+  }
+
+  function renderFeatures(features) {
+    clearAllLayers();
+
+    const useCluster = clusterToggle.checked;
+
+    for (const f of features) {
+      const coords = f.geometry?.coordinates;
+      if (!coords || coords.length < 2) continue;
+
+      const lng = coords[0], lat = coords[1];
+      const marker = L.marker([lat, lng], { icon: normalIcon });
+
+      marker.on('click', () => {
+        // resaltar seleccionado
+        if (selectedMarker && selectedMarker !== marker) selectedMarker.setIcon(normalIcon);
+        selectedMarker = marker;
+        marker.setIcon(selectedIcon);
+
+        // pintar panel derecho
+        renderDetail(f.properties || {}, marker.getLatLng());
+      });
+
+      if (useCluster) clusterLayer.addLayer(marker);
+      else plainLayer.addLayer(marker);
+    }
+
+    if (useCluster) {
+      map.addLayer(clusterLayer);
+      if (clusterLayer.getLayers().length) map.fitBounds(clusterLayer.getBounds(), { padding: [20, 20] });
+    } else {
+      const bounds = L.latLngBounds([]);
+      plainLayer.eachLayer(l => bounds.extend(l.getLatLng()));
+      if (bounds.isValid()) map.fitBounds(bounds, { padding: [20, 20] });
+    }
+  }
+
+  // ====== EVENTOS ======
+  tipoSelect.addEventListener('change', function() {
+    provinciaSelect.value = "";
+    clearCantones();
+    populateProvincias();
+    applyFilters();
+  });
+
+  provinciaSelect.addEventListener('change', function() {
+    const prov = provinciaSelect.value ? normalizeStr(provinciaSelect.value) : "";
+    if (!prov) { clearCantones(); applyFilters(); return; }
+    populateCantones(prov);
+    cantonSelect.value = "";
+    applyFilters();
+  });
+
+  cantonSelect.addEventListener('change', function() { applyFilters(); });
+  segmentoSelect.addEventListener('change', applyFilters);
+  precioMin.addEventListener('input', debounce(applyFilters, 300));
+  precioMax.addEventListener('input', debounce(applyFilters, 300));
+  buscarInput.addEventListener('input', debounce(applyFilters, 250));
+  limpiarBtn.addEventListener('click', function() { clearFilters(); });
+  clusterToggle.addEventListener('change', function() { renderFeatures(currentFiltered); clearSelection(); });
+
+  // ====== GOOGLE SHEETS ======
+  function normalizeHeader(label, index, used) {
+    let key = String(label || `COLUMNA_${index + 1}`).trim();
+    if (!key) key = `COLUMNA_${index + 1}`;
+
+    if (used[key]) {
+      used[key] += 1;
+      key = `${key} ${used[key]}`;
+    } else {
+      used[key] = 1;
+    }
+
+    return key;
+  }
+
+  function parseCoordinate(value) {
+    if (value === null || value === undefined) return NaN;
+    const cleaned = String(value).trim().replace(",", ".");
+    if (!cleaned) return NaN;
+    return Number(cleaned);
+  }
+
+  function isPublishableRow(props) {
+    const coord = normalizeStr(getProp(props, ["COORDENADA VERIFICADA"]));
+    const disponibles = normalizeStr(getProp(props, ["VIVIENDAS DISPONIBLES"]));
+    return coord === "SI" && (disponibles === "SI" || disponibles === "POR VERIFICAR");
+  }
+
+  function getValidCoordinates(props) {
+    const x = parseCoordinate(getProp(props, ["X"]));
+    const y = parseCoordinate(getProp(props, ["Y"]));
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    if (x < -82 || x > -74) return null;
+    if (y < -6 || y > 2) return null;
+    return { lng: x, lat: y };
+  }
+
+  function isValidProjectRow(props) {
+    return isPublishableRow(props) && !!getValidCoordinates(props);
+  }
+
+  function buildFeatureFromRow(props) {
+    if (!isPublishableRow(props)) return null;
+
+    const coords = getValidCoordinates(props);
+    if (!coords) return null;
+
+    return {
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [coords.lng, coords.lat] },
+      properties: props
+    };
+  }
+
+  function buildFeatureFromGroup(registro, rows) {
+    const update = Availability.get(registro);
+    const effectiveRows = update ? rows.map(row => ({...row, 'VIVIENDAS DISPONIBLES': update.state})) : rows;
+    const validRows = effectiveRows.filter(isValidProjectRow);
+    if (!validRows.length) return null;
+
+    const avg = validRows.reduce((acc, props) => {
+      const coords = getValidCoordinates(props);
+      acc.lng += coords.lng;
+      acc.lat += coords.lat;
+      return acc;
+    }, { lng: 0, lat: 0 });
+
+    const lng = avg.lng / validRows.length;
+    const lat = avg.lat / validRows.length;
+    const props = {
+      ...validRows[0],
+      "__PROJECT_ROWS": validRows,
+      "__TOTAL_HOMES": rows.every(row => Number.isSafeInteger(row['NRO DE VIVIENDAS']) && row['NRO DE VIVIENDAS'] >= 0) ? rows.reduce((sum, row) => sum + row['NRO DE VIVIENDAS'], 0) : null,
+      "__REGISTRO_GRUPO": registro,
+      "__FILTERS": {
+        segmento: getUniqueSorted(validRows.map(getSegmento)),
+        tipo: getUniqueSorted(validRows.map(p => normalizeStr(getTipo(p)))),
+        provincia: getUniqueSorted(validRows.map(p => normalizeStr(getProvincia(p)))),
+        canton: getUniqueSorted(validRows.map(p => normalizeStr(getCanton(p))))
+      }
+    };
+
+    return {
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [lng, lat] },
+      properties: props
+    };
+  }
+
+  function groupRowsByRegistro(rows) {
+    const groups = new Map();
+
+    for (const props of rows) {
+      const registro = normalizeStr(getRegistro(props));
+      if (!registro) continue;
+      if (!groups.has(registro)) groups.set(registro, []);
+      groups.get(registro).push(props);
+    }
+
+    return groups;
+  }
+
+  function sheetTableToFeatures(table) {
+    const usedHeaders = {};
+    const headers = (table.cols || []).map((col, index) => normalizeHeader(col.label || col.id, index, usedHeaders));
+    const rows = (table.rows || [])
+      .map(row => {
+        const props = {};
+        headers.forEach((header, index) => {
+          const cell = row.c && row.c[index];
+          props[header] = cell ? (["NRO DE VIVIENDAS", "PRECIO DE VENTA"].includes(header) ? (cell.v ?? "") : (cell.f ?? cell.v ?? "")) : "";
+        });
+        return props;
+      });
+
+    return Array.from(groupRowsByRegistro(rows).entries())
+      .map(([registro, groupedRows]) => buildFeatureFromGroup(registro, groupedRows))
+      .filter(Boolean);
+  }
+
+  let sheetLoading = false;
+  const availabilityStatus = document.getElementById('availabilityStatus');
+  document.getElementById('promoterAccess').addEventListener('click', () => {
+    if (!Availability.open()) availabilityStatus.textContent = Availability.setupMessage;
+  });
+  document.getElementById('refreshData').addEventListener('click', loadGoogleSheet);
+
+  window.googleSheetLoaded = async function(response) {
+    try {
+      if (!response || response.status === "error") {
+        throw new Error(response?.errors?.[0]?.message || "Respuesta no valida de Google Sheets");
+      }
+
+      const table = response.table || {};
+      // K contiene el registro; el hash evita llevar la clave de ingreso en la URL del panel.
+      const registrationIndex = (table.cols || []).findIndex(col => /^(NRO\.?|NUMERO|NO\.?) DE REGISTRO$/.test(normalizeStr(col.label)));
+      if (registrationIndex < 0) throw new Error('No se encontró la columna de registro.');
+      await Promise.all([
+        Availability.prepare((table.rows || []).map(row => row.c?.[registrationIndex]?.f ?? row.c?.[registrationIndex]?.v ?? '')),
+        Availability.refresh()
+      ]);
+      const selectedProvince = provinciaSelect.value;
+      const selectedCanton = cantonSelect.value;
+      allFeatures = sheetTableToFeatures(table);
+      currentFiltered = allFeatures;
+
+      populateProvincias();
+      provinciaSelect.value = selectedProvince;
+      if (provinciaSelect.value) {
+        populateCantones(provinciaSelect.value);
+        cantonSelect.value = selectedCanton;
+      } else clearCantones();
+      populateSegmentos();
+      applyFilters();
+      availabilityStatus.textContent = Availability.configured ? 'Disponibilidad sincronizada: ' + new Date().toLocaleString('es-EC') : '';
+    } catch (err) {
+      console.error(err);
+      allFeatures = []; currentFiltered = []; renderFeatures([]); clearSelection();
+      statsBox.textContent = 'No se pudieron actualizar los datos. Pulsa «Actualizar datos» para reintentar.';
+      availabilityStatus.textContent = err.message || 'Error consultando Google Sheets o el servicio de disponibilidad.';
+    } finally {
+      sheetLoading = false;
+      document.getElementById('refreshData').disabled = false;
+    }
+  };
+
+  function loadGoogleSheet() {
+    if (sheetLoading) return;
+    sheetLoading = true;
+    document.getElementById('refreshData').disabled = true;
+    availabilityStatus.textContent = 'Consultando matriz y disponibilidad…';
+    const script = document.createElement("script");
+    const tqx = encodeURIComponent("out:json;responseHandler:googleSheetLoaded");
+    // El visor solo necesita A:W; X (RUC) se consulta en el servidor de Apps Script.
+    const query = encodeURIComponent('select ' + Array.from({length: 23}, (_, index) => String.fromCharCode(65 + index)).join(','));
+    script.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=${tqx}&tq=${query}&gid=${SHEET_GID}&t=${Date.now()}`;
+    script.onload = () => script.remove();
+    script.onerror = () => {
+      script.remove(); sheetLoading = false;
+      document.getElementById('refreshData').disabled = false;
+      allFeatures = []; currentFiltered = []; renderFeatures([]); clearSelection();
+      statsBox.textContent = 'Error cargando Google Sheets. Verifica que la hoja sea pública.';
+      availabilityStatus.textContent = 'Pulsa «Actualizar datos» para reintentar.';
+    };
+    document.body.appendChild(script);
+  }
+
+  loadGoogleSheet();
+
+</script>
+</body>
+</html>
+
+
